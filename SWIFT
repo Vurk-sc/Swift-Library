@@ -2,26 +2,22 @@
     SWIFT UI LIBRARY - EXPLOIT OPTIMIZED VERSION
     Designed for Roblox exploit environments with loadstring
 
+    Features:
+    • Anti-detection mechanisms
+    • Memory efficient design
+    • Advanced animations and effects
+    • Exploit-specific utilities
+    • Cross-platform compatibility
 
-Features:
-\u2022 Anti-detection mechanisms
-\u2022 Memory efficient design
-\u2022 Advanced animations and effects
-\u2022 Exploit-specific utilities
-\u2022 Cross-platform compatibility
+    Version: 2.0.1
+    Author: Ist5208
 
-Version: 2.0.0
-Author: Ist5208
-
-Usage: loadstring(game:HttpGet("URL"))()
-
+    Usage: loadstring(game:HttpGet("URL"))()
 ]]
-
 
 -- Environment detection and compatibility
 local isExploit = (syn and syn.queue_on_teleport) or (getexecutorname and true) or false
 local executorName = getexecutorname and getexecutorname() or "Unknown"
-
 
 -- Anti-detection layer
 local AntiDetect = {
@@ -30,7 +26,6 @@ local AntiDetect = {
     obfuscationLevel = 1
 }
 
-
 -- Service getters with fallback
 local function GetService(serviceName)
     local success, service = pcall(function()
@@ -38,7 +33,6 @@ local function GetService(serviceName)
     end)
     return success and service or nil
 end
-
 
 -- Core services
 local Players = GetService("Players")
@@ -50,31 +44,27 @@ local GuiService = GetService("GuiService")
 local HttpService = GetService("HttpService")
 local StarterGui = GetService("StarterGui")
 
-
 -- Security utilities
 local Security = {
     randomNames = {},
     nameCounter = 0,
 
+    generateRandomName = function(prefix)
+        Security.nameCounter = Security.nameCounter + 1
+        local randomStr = string.format("%X", math.random(0x1000, 0xFFFF))
+        return (prefix or "Swift") .. "_" .. randomStr .. "_" .. Security.nameCounter
+    end,
 
-generateRandomName = function(prefix)
-    Security.nameCounter = Security.nameCounter + 1
-    local randomStr = string.format("%X", math.random(0x1000, 0xFFFF))
-    return (prefix or "Swift") .. "_" .. randomStr .. "_" .. Security.nameCounter
-end,
-
-obfuscateProperty = function(obj, properties)
-    if not AntiDetect.enabled then return end
-    
-    for _, prop in ipairs(properties) do
-        local randomProp = Security.generateRandomName("prop")
-        obj[randomProp] = obj[prop]
-        obj[prop] = nil
+    obfuscateProperty = function(obj, properties)
+        if not AntiDetect.enabled then return end
+        
+        for _, prop in ipairs(properties) do
+            local randomProp = Security.generateRandomName("prop")
+            obj[randomProp] = obj[prop]
+            obj[prop] = nil
+        end
     end
-end
-
 }
-
 
 -- Memory management
 local MemoryManager = {
@@ -82,148 +72,141 @@ local MemoryManager = {
     connections = {},
     maxObjects = 500,
 
-
-track = function(obj, type)
-    if #MemoryManager.objects >= MemoryManager.maxObjects then
-        MemoryManager.cleanup()
-    end
-    
-    table.insert(MemoryManager.objects, {
-        object = obj,
-        type = type or "unknown",
-        created = tick()
-    })
-    return obj
-end,
-
-trackConnection = function(connection)
-    table.insert(MemoryManager.connections, connection)
-    return connection
-end,
-
-cleanup = function()
-    local toRemove = {}
-    
-    for i, obj in ipairs(MemoryManager.objects) do
-        if obj.object and obj.object.Parent == nil then
-            table.insert(toRemove, i)
+    track = function(obj, type)
+        if #MemoryManager.objects >= MemoryManager.maxObjects then
+            MemoryManager.cleanup()
         end
-    end
-    
-    for i = #toRemove, 1, -1 do
-        table.remove(MemoryManager.objects, toRemove[i])
-    end
-end,
+        
+        table.insert(MemoryManager.objects, {
+            object = obj,
+            type = type or "unknown",
+            created = tick()
+        })
+        return obj
+    end,
 
-cleanupAll = function()
-    for _, connection in ipairs(MemoryManager.connections) do
-        if connection and connection.Disconnect then
-            connection:Disconnect()
-        end
-    end
-    
-    for _, obj in ipairs(MemoryManager.objects) do
-        if obj.object and obj.object.Destroy then
-            obj.object:Destroy()
-        end
-    end
-    
-    MemoryManager.objects = {}
-    MemoryManager.connections = {}
-end
+    trackConnection = function(connection)
+        table.insert(MemoryManager.connections, connection)
+        return connection
+    end,
 
+    cleanup = function()
+        local toRemove = {}
+        
+        for i, obj in ipairs(MemoryManager.objects) do
+            if obj.object and obj.object.Parent == nil then
+                table.insert(toRemove, i)
+            end
+        end
+        
+        for i = #toRemove, 1, -1 do
+            table.remove(MemoryManager.objects, toRemove[i])
+        end
+    end,
+
+    cleanupAll = function()
+        for _, connection in ipairs(MemoryManager.connections) do
+            if connection and connection.Disconnect then
+                pcall(function() connection:Disconnect() end)
+            end
+        end
+        
+        for _, obj in ipairs(MemoryManager.objects) do
+            if obj.object and obj.object.Destroy then
+                pcall(function() obj.object:Destroy() end)
+            end
+        end
+        
+        MemoryManager.objects = {}
+        MemoryManager.connections = {}
+    end
 }
-
 
 -- Advanced animation system
 local AnimationSystem = {
     animations = {},
     fps = 60,
 
+    create = function(obj, info, goal)
+        local animation = {
+            object = obj,
+            info = info,
+            goal = goal,
+            startTime = tick(),
+            connection = nil
+        }
+        
+        if TweenService then
+            local tween = TweenService:Create(obj, info, goal)
+            animation.tween = tween
+            animation.connection = MemoryManager.trackConnection(tween.Completed:Connect(function()
+                AnimationSystem.remove(animation)
+            end))
+            tween:Play()
+        else
+            -- Fallback animation
+            animation.connection = MemoryManager.trackConnection(RunService.Heartbeat:Connect(function()
+                AnimationSystem.update(animation)
+            end))
+        end
+        
+        table.insert(AnimationSystem.animations, animation)
+        return animation
+    end,
 
-create = function(obj, info, goal)
-    local animation = {
-        object = obj,
-        info = info,
-        goal = goal,
-        startTime = tick(),
-        connection = nil
-    }
-    
-    if TweenService then
-        local tween = TweenService:Create(obj, info, goal)
-        animation.tween = tween
-        animation.connection = MemoryManager.trackConnection(tween.Completed:Connect(function()
+    update = function(animation)
+        if not animation.object or not animation.object.Parent then
             AnimationSystem.remove(animation)
-        end))
-        tween:Play()
-    else
-        -- Fallback animation
-        animation.connection = MemoryManager.trackConnection(RunService.Heartbeat:Connect(function()
-            AnimationSystem.update(animation)
-        end))
-    end
-    
-    table.insert(AnimationSystem.animations, animation)
-    return animation
-end,
+            return
+        end
+        
+        local elapsed = tick() - animation.startTime
+        local progress = math.min(elapsed / animation.info.Time, 1)
+        
+        for property, target in pairs(animation.goal) do
+            local current = animation.object[property]
+            if typeof(current) == "UDim2" then
+                animation.object[property] = UDim2.new(
+                    current.X.Scale + (target.X.Scale - current.X.Scale) * progress,
+                    current.X.Offset + (target.X.Offset - current.X.Offset) * progress,
+                    current.Y.Scale + (target.Y.Scale - current.Y.Scale) * progress,
+                    current.Y.Offset + (target.Y.Offset - current.Y.Offset) * progress
+                )
+            elseif typeof(current) == "Color3" then
+                animation.object[property] = Color3.new(
+                    current.R + (target.R - current.R) * progress,
+                    current.G + (target.G - current.G) * progress,
+                    current.B + (target.B - current.B) * progress
+                )
+            elseif typeof(current) == "number" then
+                animation.object[property] = current + (target - current) * progress
+            end
+        end
+        
+        if progress >= 1 then
+            AnimationSystem.remove(animation)
+        end
+    end,
 
-update = function(animation)
-    if not animation.object or not animation.object.Parent then
-        AnimationSystem.remove(animation)
-        return
-    end
-    
-    local elapsed = tick() - animation.startTime
-    local progress = math.min(elapsed / animation.info.Time, 1)
-    
-    for property, target in pairs(animation.goal) do
-        local current = animation.object[property]
-        if typeof(current) == "UDim2" then
-            animation.object[property] = UDim2.new(
-                current.X.Scale + (target.X.Scale - current.X.Scale) * progress,
-                current.X.Offset + (target.X.Offset - current.X.Offset) * progress,
-                current.Y.Scale + (target.Y.Scale - current.Y.Scale) * progress,
-                current.Y.Offset + (target.Y.Offset - current.Y.Offset) * progress
-            )
-        elseif typeof(current) == "Color3" then
-            animation.object[property] = Color3.new(
-                current.R + (target.R - current.R) * progress,
-                current.G + (target.G - current.G) * progress,
-                current.B + (target.B - current.B) * progress
-            )
-        elseif typeof(current) == "number" then
-            animation.object[property] = current + (target - current) * progress
+    remove = function(animation)
+        if animation.connection then
+            pcall(function() animation.connection:Disconnect() end)
+        end
+        
+        for i, anim in ipairs(AnimationSystem.animations) do
+            if anim == animation then
+                table.remove(AnimationSystem.animations, i)
+                break
+            end
         end
     end
-    
-    if progress >= 1 then
-        AnimationSystem.remove(animation)
-    end
-end,
-
-remove = function(animation)
-    if animation.connection then
-        animation.connection:Disconnect()
-    end
-    
-    for i, anim in ipairs(AnimationSystem.animations) do
-        if anim == animation then
-            table.remove(AnimationSystem.animations, i)
-            break
-        end
-    end
-end
-
 }
-
 
 -- Main Swift Library
 local Swift = {}
-Swift.Version = "2.0.0-Exploit"
+Swift.Version = "2.0.1-Exploit"
 Swift.isExploit = isExploit
 Swift.executorName = executorName
-
 
 -- Configuration
 local Config = {
@@ -240,7 +223,6 @@ local Config = {
     MobileMode = false,
     FPS = 60
 }
-
 
 -- Enhanced color palettes with gradients
 local Themes = {
@@ -291,23 +273,6 @@ local Themes = {
     }
 }
 
-
--- Utility functions
-local function lerp(a, b, t)
-    return a + (b - a) * t
-end
-
-
-local function randomString(length)
-    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    local result = ""
-    for i = 1, length do
-        result = result .. string.sub(chars, math.random(#chars), math.random(#chars))
-    end
-    return result
-end
-
-
 -- Enhanced UI creation functions
 local function createFrame(parent, name, properties)
     local frame = Instance.new("Frame")
@@ -316,17 +281,14 @@ local function createFrame(parent, name, properties)
     frame.BorderSizePixel = 0
     frame.Parent = parent
 
-
-if properties then
-    for prop, value in pairs(properties) do
-        frame[prop] = value
+    if properties then
+        for prop, value in pairs(properties) do
+            frame[prop] = value
+        end
     end
+
+    return MemoryManager.track(frame, "frame")
 end
-
-return MemoryManager.track(frame, "frame")
-
-end
-
 
 local function createTextLabel(parent, name, text, properties)
     local label = Instance.new("TextLabel")
@@ -338,17 +300,14 @@ local function createTextLabel(parent, name, text, properties)
     label.TextSize = Config.DefaultTextSize
     label.Parent = parent
 
-
-if properties then
-    for prop, value in pairs(properties) do
-        label[prop] = value
+    if properties then
+        for prop, value in pairs(properties) do
+            label[prop] = value
+        end
     end
+
+    return MemoryManager.track(label, "textlabel")
 end
-
-return MemoryManager.track(label, "textlabel")
-
-end
-
 
 local function createTextButton(parent, name, text, properties)
     local button = Instance.new("TextButton")
@@ -361,17 +320,14 @@ local function createTextButton(parent, name, text, properties)
     button.BorderSizePixel = 0
     button.Parent = parent
 
-
-if properties then
-    for prop, value in pairs(properties) do
-        button[prop] = value
+    if properties then
+        for prop, value in pairs(properties) do
+            button[prop] = value
+        end
     end
+
+    return MemoryManager.track(button, "textbutton")
 end
-
-return MemoryManager.track(button, "textbutton")
-
-end
-
 
 local function createImageLabel(parent, name, image, properties)
     local imageLabel = Instance.new("ImageLabel")
@@ -380,17 +336,14 @@ local function createImageLabel(parent, name, image, properties)
     imageLabel.BackgroundTransparency = 1
     imageLabel.Parent = parent
 
-
-if properties then
-    for prop, value in pairs(properties) do
-        imageLabel[prop] = value
+    if properties then
+        for prop, value in pairs(properties) do
+            imageLabel[prop] = value
+        end
     end
+
+    return MemoryManager.track(imageLabel, "imagelabel")
 end
-
-return MemoryManager.track(imageLabel, "imagelabel")
-
-end
-
 
 local function applyCornerRadius(obj, radius)
     local corner = Instance.new("UICorner")
@@ -398,7 +351,6 @@ local function applyCornerRadius(obj, radius)
     corner.Parent = obj
     return MemoryManager.track(corner, "uicorner")
 end
-
 
 local function applyPadding(obj, padding)
     local pad = Instance.new("UIPadding")
@@ -410,7 +362,6 @@ local function applyPadding(obj, padding)
     return MemoryManager.track(pad, "uipadding")
 end
 
-
 local function applyListLayout(obj, direction, padding)
     local layout = Instance.new("UIListLayout")
     layout.FillDirection = direction or Enum.FillDirection.Vertical
@@ -420,7 +371,6 @@ local function applyListLayout(obj, direction, padding)
     return MemoryManager.track(layout, "uilistlayout")
 end
 
-
 local function applyGradient(obj, colors, rotation)
     local gradient = Instance.new("UIGradient")
     gradient.Color = colors
@@ -428,7 +378,6 @@ local function applyGradient(obj, colors, rotation)
     gradient.Parent = obj
     return MemoryManager.track(gradient, "uigradient")
 end
-
 
 local function applyStroke(obj, color, thickness)
     local stroke = Instance.new("UIStroke")
@@ -438,69 +387,47 @@ local function applyStroke(obj, color, thickness)
     return MemoryManager.track(stroke, "uistroke")
 end
 
-
-local function applyBlur(obj, size)
-    if not CoreGui then return nil end
-
-
-local blur = Instance.new("BlurEffect")
-blur.Size = size
-blur.Parent = CoreGui
-return MemoryManager.track(blur, "blureffect")
-
-end
-
-
 local function animate(obj, properties, duration, easingStyle)
     duration = duration or Config.AnimationSpeed
     easingStyle = easingStyle or Enum.EasingStyle.Quad
 
+    local tweenInfo = TweenInfo.new(duration, easingStyle, Enum.EasingDirection.InOut)
 
-local tweenInfo = TweenInfo.new(duration, easingStyle, Enum.EasingDirection.InOut)
-
-if TweenService then
-    local tween = TweenService:Create(obj, tweenInfo, properties)
-    tween:Play()
-    return tween
-else
-    return AnimationSystem.create(obj, tweenInfo, properties)
+    if TweenService then
+        local tween = TweenService:Create(obj, tweenInfo, properties)
+        tween:Play()
+        return tween
+    else
+        return AnimationSystem.create(obj, tweenInfo, properties)
+    end
 end
-
-end
-
 
 -- Advanced Window Class
 local Window = {}
 Window.__index = Window
 
-
 function Window.new(title, options)
     options = options or {}
     local self = setmetatable({}, Window)
 
+    self.Title = title or "Swift Window"
+    self.Theme = options.theme or Config.DefaultTheme
+    self.Colors = Themes[self.Theme] or Themes.dark
+    self.Draggable = options.draggable ~= false
+    self.Resizable = options.resizable or false
+    self.Minimizable = options.minimizable or true
+    self.Size = options.size or UDim2.new(0, 500, 0, 600)
+    self.Position = options.position or UDim2.new(0.5, -250, 0.5, -300)
+    self.MinSize = options.minSize or UDim2.new(0, 300, 0, 200)
+    self.MaxSize = options.maxSize or UDim2.new(1, 0, 1, 0)
+    self.Connections = {}
+    self.Minimized = false
+    self.Visible = true
+    self.OriginalSize = self.Size
 
-self.Title = title or "Swift Window"
-self.Theme = options.theme or Config.DefaultTheme
-self.Colors = Themes[self.Theme] or Themes.dark
-self.Draggable = options.draggable ~= false
-self.Resizable = options.resizable or false
-self.Minimizable = options.minimizable or true
-self.Size = options.size or UDim2.new(0, 500, 0, 600)
-self.Position = options.position or UDim2.new(0.5, -250, 0.5, -300)
-self.MinSize = options.minSize or UDim2.new(0, 300, 0, 200)
-self.MaxSize = options.maxSize or UDim2.new(1, 0, 1, 0)
-self.Blur = options.blur or false
-self.BlurEffect = nil
-self.Connections = {}
-self.Minimized = false
-self.Visible = true
-self.OriginalSize = self.Size
-
-self:CreateUI(options)
-return self
-
+    self:CreateUI(options)
+    return self
 end
-
 
 function Window:CreateUI(options)
     -- Main ScreenGui
@@ -508,338 +435,300 @@ function Window:CreateUI(options)
     self.ScreenGui.Name = AntiDetect.enabled and Security.generateRandomName("SwiftScreenGui") or "SwiftScreenGui"
     self.ScreenGui.ResetOnSpawn = false
     self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    self.ScreenGui.Parent = CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
+    
+    -- Try CoreGui first, fallback to PlayerGui
+    local success = pcall(function()
+        self.ScreenGui.Parent = CoreGui
+    end)
+    
+    if not success then
+        self.ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
 
+    -- Main Window Frame
+    self.Frame = createFrame(self.ScreenGui, "SwiftWindow", {
+        Size = self.Size,
+        Position = self.Position,
+        BackgroundColor3 = self.Colors.background,
+        BorderSizePixel = 0
+    })
 
--- Apply blur if enabled
-if self.Blur then
-    self.BlurEffect = applyBlur(self.ScreenGui, Config.BlurSize)
-end
+    -- Apply gradient background
+    applyGradient(self.Frame, ColorSequence.new{
+        ColorSequenceKeypoint.new(0, self.Colors.gradientStart),
+        ColorSequenceKeypoint.new(1, self.Colors.gradientEnd)
+    }, 45)
 
--- Main Window Frame
-self.Frame = createFrame(self.ScreenGui, "SwiftWindow", {
-    Size = self.Size,
-    Position = self.Position,
-    BackgroundColor3 = self.Colors.background,
-    BorderSizePixel = 0
-})
+    applyCornerRadius(self.Frame, Config.DefaultCornerRadius)
+    applyStroke(self.Frame, self.Colors.border, 1)
 
--- Apply gradient background
-applyGradient(self.Frame, ColorSequence.new{
-    ColorSequenceKeypoint.new(0, self.Colors.gradientStart),
-    ColorSequenceKeypoint.new(1, self.Colors.gradientEnd)
-}, 45)
+    -- Title Bar
+    self.TitleBar = createFrame(self.Frame, "TitleBar", {
+        Size = UDim2.new(1, 0, 0, 40),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = self.Colors.surface
+    })
 
-applyCornerRadius(self.Frame, Config.DefaultCornerRadius)
-applyStroke(self.Frame, self.Colors.border, 1)
+    applyGradient(self.TitleBar, ColorSequence.new{
+        ColorSequenceKeypoint.new(0, self.Colors.primary),
+        ColorSequenceKeypoint.new(1, self.Colors.accent)
+    }, 90)
 
--- Shadow effect
-self.Shadow = createFrame(self.Frame, "Shadow", {
-    Size = UDim2.new(1, 10, 1, 10),
-    Position = UDim2.new(0, -5, 0, -5),
-    BackgroundColor3 = self.Colors.shadow,
-    BorderSizePixel = 0,
-    ZIndex = -1
-})
-applyCornerRadius(self.Shadow, Config.DefaultCornerRadius)
-self.Shadow.ImageTransparency = 0.8
+    applyCornerRadius(self.TitleBar, Config.DefaultCornerRadius)
 
--- Title Bar
-self.TitleBar = createFrame(self.Frame, "TitleBar", {
-    Size = UDim2.new(1, 0, 0, 40),
-    Position = UDim2.new(0, 0, 0, 0),
-    BackgroundColor3 = self.Colors.surface
-})
+    -- Window Controls
+    self.ControlFrame = createFrame(self.TitleBar, "ControlFrame", {
+        Size = UDim2.new(0, 120, 1, 0),
+        Position = UDim2.new(1, -120, 0, 0),
+        BackgroundTransparency = 1
+    })
 
-applyGradient(self.TitleBar, ColorSequence.new{
-    ColorSequenceKeypoint.new(0, self.Colors.primary),
-    ColorSequenceKeypoint.new(1, self.Colors.accent)
-}, 90)
+    -- Minimize Button
+    if self.Minimizable then
+        self.MinimizeButton = createTextButton(self.ControlFrame, "Minimize", "−", {
+            Size = UDim2.new(0, 30, 0, 30),
+            Position = UDim2.new(0, 5, 0.5, -15),
+            BackgroundColor3 = Color3.fromRGB(255, 193, 7),
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            TextSize = 18,
+            Font = Enum.Font.GothamBold
+        })
+        applyCornerRadius(self.MinimizeButton, 4)
+        
+        self.MinimizeButton.MouseEnter:Connect(function()
+            animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 160, 0)}, 0.2)
+        end)
+        
+        self.MinimizeButton.MouseLeave:Connect(function()
+            animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 193, 7)}, 0.2)
+        end)
+        
+        self.MinimizeButton.MouseButton1Click:Connect(function()
+            self:ToggleMinimize()
+        end)
+    end
 
-applyCornerRadius(self.TitleBar, UDim.new(0, Config.DefaultCornerRadius))
-
--- Window Controls
-self.ControlFrame = createFrame(self.TitleBar, "ControlFrame", {
-    Size = UDim2.new(0, 120, 1, 0),
-    Position = UDim2.new(1, -120, 0, 0),
-    BackgroundTransparency = 1
-})
-
--- Minimize Button
-if self.Minimizable then
-    self.MinimizeButton = createTextButton(self.ControlFrame, "Minimize", "\u2212", {
+    -- Close Button
+    self.CloseButton = createTextButton(self.ControlFrame, "Close", "×", {
         Size = UDim2.new(0, 30, 0, 30),
-        Position = UDim2.new(0, 5, 0.5, -15),
-        BackgroundColor3 = Color3.fromRGB(255, 193, 7),
+        Position = UDim2.new(1, -35, 0.5, -15),
+        BackgroundColor3 = Color3.fromRGB(244, 67, 54),
         TextColor3 = Color3.fromRGB(255, 255, 255),
         TextSize = 18,
         Font = Enum.Font.GothamBold
     })
-    applyCornerRadius(self.MinimizeButton, 4)
-    
-    self.MinimizeButton.MouseEnter:Connect(function()
-        animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 160, 0)}, 0.2)
+    applyCornerRadius(self.CloseButton, 4)
+
+    self.CloseButton.MouseEnter:Connect(function()
+        animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(229, 57, 53)}, 0.2)
     end)
-    
-    self.MinimizeButton.MouseLeave:Connect(function()
-        animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 193, 7)}, 0.2)
+
+    self.CloseButton.MouseLeave:Connect(function()
+        animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(244, 67, 54)}, 0.2)
     end)
-    
-    self.MinimizeButton.MouseButton1Click:Connect(function()
-        self:ToggleMinimize()
+
+    self.CloseButton.MouseButton1Click:Connect(function()
+        self:Close()
     end)
+
+    -- Title Text
+    self.TitleLabel = createTextLabel(self.TitleBar, "TitleLabel", self.Title, {
+        Size = UDim2.new(1, -140, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = Enum.Font.GothamBold,
+        TextSize = 16
+    })
+    applyPadding(self.TitleLabel, 12)
+
+    -- Content Container
+    self.ContentFrame = createFrame(self.Frame, "ContentFrame", {
+        Size = UDim2.new(1, 0, 1, -40),
+        Position = UDim2.new(0, 0, 0, 40),
+        BackgroundTransparency = 1
+    })
+
+    applyListLayout(self.ContentFrame, Enum.FillDirection.Vertical, Config.Padding)
+    applyPadding(self.ContentFrame, Config.Padding)
+
+    -- Setup interactions
+    if self.Draggable then
+        self:SetupDragging()
+    end
+
+    if self.Resizable then
+        self:SetupResizing()
+    end
+
+    -- Show animation
+    self.Frame.Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)
+    animate(self.Frame, {Size = self.Size}, 0.4, Enum.EasingStyle.Back)
+
+    MemoryManager.track(self.ScreenGui, "screengui")
 end
-
--- Close Button
-self.CloseButton = createTextButton(self.ControlFrame, "Close", "\u00d7", {
-    Size = UDim2.new(0, 30, 0, 30),
-    Position = UDim2.new(1, -35, 0.5, -15),
-    BackgroundColor3 = Color3.fromRGB(244, 67, 54),
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    TextSize = 18,
-    Font = Enum.Font.GothamBold
-})
-applyCornerRadius(self.CloseButton, 4)
-
-self.CloseButton.MouseEnter:Connect(function()
-    animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(229, 57, 53)}, 0.2)
-end)
-
-self.CloseButton.MouseLeave:Connect(function()
-    animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(244, 67, 54)}, 0.2)
-end)
-
-self.CloseButton.MouseButton1Click:Connect(function()
-    self:Close()
-end)
-
--- Title Text
-self.TitleLabel = createTextLabel(self.TitleBar, "TitleLabel", self.Title, {
-    Size = UDim2.new(1, -140, 1, 0),
-    Position = UDim2.new(0, 10, 0, 0),
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    Font = Enum.Font.GothamBold,
-    TextSize = 16
-})
-applyPadding(self.TitleLabel, 12)
-
--- Content Container
-self.ContentFrame = createFrame(self.Frame, "ContentFrame", {
-    Size = UDim2.new(1, 0, 1, -40),
-    Position = UDim2.new(0, 0, 0, 40),
-    BackgroundTransparency = 1
-})
-
-applyListLayout(self.ContentFrame, Enum.FillDirection.Vertical, Config.Padding)
-applyPadding(self.ContentFrame, Config.Padding)
-
--- Setup interactions
-if self.Draggable then
-    self:SetupDragging()
-end
-
-if self.Resizable then
-    self:SetupResizing()
-end
-
--- Show animation
-self.Frame.Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)
-animate(self.Frame, {Size = self.Size}, 0.4, Enum.EasingStyle.Back)
-
-MemoryManager.track(self.ScreenGui, "screengui")
-
-end
-
 
 function Window:SetupDragging()
-    local UserInputService = GetService("UserInputService")
     if not UserInputService then return end
 
+    local dragging = false
+    local dragStartPos = Vector2.new(0, 0)
+    local frameStartPos = Vector2.new(0, 0)
 
-local dragging = false
-local dragStartPos = Vector2.new(0, 0)
-local frameStartPos = Vector2.new(0, 0)
+    local dragStartConnection = self.TitleBar.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStartPos = Vector2.new(input.Position.X, input.Position.Y)
+            frameStartPos = Vector2.new(self.Frame.AbsolutePosition.X, self.Frame.AbsolutePosition.Y)
+            
+            -- Bring window to front
+            self.ScreenGui.DisplayOrder = 1000
+        end
+    end)
 
-local dragStartConnection = MemoryManager.trackConnection(self.TitleBar.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStartPos = Vector2.new(input.Position.X, input.Position.Y)
-        frameStartPos = Vector2.new(self.Frame.AbsolutePosition.X, self.Frame.AbsolutePosition.Y)
-        
-        -- Bring window to front
-        self.ScreenGui.DisplayOrder = 1000
-    end
-end))
+    local dragEndConnection = self.TitleBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
 
-local dragEndConnection = MemoryManager.trackConnection(self.TitleBar.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end))
+    local dragMoveConnection = UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+            local delta = mousePos - dragStartPos
+            self.Frame.Position = UDim2.new(0, frameStartPos.X + delta.X, 0, frameStartPos.Y + delta.Y)
+        end
+    end)
 
-local dragMoveConnection = MemoryManager.trackConnection(UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        local delta = mousePos - dragStartPos
-        self.Frame.Position = UDim2.new(0, frameStartPos.X + delta.X, 0, frameStartPos.Y + delta.Y)
-    end
-end))
-
-table.insert(self.Connections, dragStartConnection)
-table.insert(self.Connections, dragEndConnection)
-table.insert(self.Connections, dragMoveConnection)
-
+    table.insert(self.Connections, MemoryManager.trackConnection(dragStartConnection))
+    table.insert(self.Connections, MemoryManager.trackConnection(dragEndConnection))
+    table.insert(self.Connections, MemoryManager.trackConnection(dragMoveConnection))
 end
-
 
 function Window:SetupResizing()
-    local UserInputService = GetService("UserInputService")
     if not UserInputService then return end
 
+    -- Resize handle
+    self.ResizeHandle = createFrame(self.Frame, "ResizeHandle", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(1, -20, 1, -20),
+        BackgroundColor3 = self.Colors.primary,
+        BorderSizePixel = 0
+    })
+    applyCornerRadius(self.ResizeHandle, Config.DefaultCornerRadius)
 
--- Resize handle
-self.ResizeHandle = createFrame(self.Frame, "ResizeHandle", {
-    Size = UDim2.new(0, 20, 0, 20),
-    Position = UDim2.new(1, -20, 1, -20),
-    BackgroundColor3 = self.Colors.primary,
-    BorderSizePixel = 0
-})
-applyCornerRadius(self.ResizeHandle, 0, 0, Config.DefaultCornerRadius, 0)
+    local resizing = false
+    local resizeStartPos = Vector2.new(0, 0)
+    local resizeStartSize = UDim2.new(0, 0, 0, 0)
 
-local resizing = false
-local resizeStartPos = Vector2.new(0, 0)
-local resizeStartSize = UDim2.new(0, 0, 0, 0)
+    local resizeStartConnection = self.ResizeHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            resizing = true
+            resizeStartPos = Vector2.new(input.Position.X, input.Position.Y)
+            resizeStartSize = self.Frame.Size
+        end
+    end)
 
-local resizeStartConnection = MemoryManager.trackConnection(self.ResizeHandle.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        resizing = true
-        resizeStartPos = Vector2.new(input.Position.X, input.Position.Y)
-        resizeStartSize = self.Frame.Size
-    end
-end))
+    local resizeEndConnection = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            resizing = false
+        end
+    end)
 
-local resizeEndConnection = MemoryManager.trackConnection(UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        resizing = false
-    end
-end))
+    local resizeMoveConnection = UserInputService.InputChanged:Connect(function(input)
+        if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
+            local delta = mousePos - resizeStartPos
+            
+            local newWidth = math.max(self.MinSize.X.Offset, math.min(self.MaxSize.X.Offset or 2000, resizeStartSize.X.Offset + delta.X))
+            local newHeight = math.max(self.MinSize.Y.Offset, math.min(self.MaxSize.Y.Offset or 2000, resizeStartSize.Y.Offset + delta.Y))
+            
+            self.Frame.Size = UDim2.new(0, newWidth, 0, newHeight)
+            self.ContentFrame.Size = UDim2.new(1, 0, 1, -40)
+        end
+    end)
 
-local resizeMoveConnection = MemoryManager.trackConnection(UserInputService.InputChanged:Connect(function(input)
-    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-        local delta = mousePos - resizeStartPos
-        
-        local newWidth = math.max(self.MinSize.X.Offset, math.min(self.MaxSize.X.Offset, resizeStartSize.X.Offset + delta.X))
-        local newHeight = math.max(self.MinSize.Y.Offset, math.min(self.MaxSize.Y.Offset, resizeStartSize.Y.Offset + delta.Y))
-        
-        self.Frame.Size = UDim2.new(0, newWidth, 0, newHeight)
-        self.ContentFrame.Size = UDim2.new(1, 0, 1, -40)
-    end
-end))
-
-table.insert(self.Connections, resizeStartConnection)
-table.insert(self.Connections, resizeEndConnection)
-table.insert(self.Connections, resizeMoveConnection)
-
+    table.insert(self.Connections, MemoryManager.trackConnection(resizeStartConnection))
+    table.insert(self.Connections, MemoryManager.trackConnection(resizeEndConnection))
+    table.insert(self.Connections, MemoryManager.trackConnection(resizeMoveConnection))
 end
-
 
 function Window:ToggleMinimize()
     self.Minimized = not self.Minimized
 
-
-if self.Minimized then
-    self.OriginalSize = self.Frame.Size
-    animate(self.Frame, {Size = UDim2.new(self.OriginalSize.X.Scale, self.OriginalSize.X.Offset, 0, 40)}, 0.3)
-    self.ContentFrame.Visible = false
-else
-    animate(self.Frame, {Size = self.OriginalSize}, 0.3)
-    self.ContentFrame.Visible = true
+    if self.Minimized then
+        self.OriginalSize = self.Frame.Size
+        animate(self.Frame, {Size = UDim2.new(self.OriginalSize.X.Scale, self.OriginalSize.X.Offset, 0, 40)}, 0.3)
+        self.ContentFrame.Visible = false
+    else
+        animate(self.Frame, {Size = self.OriginalSize}, 0.3)
+        self.ContentFrame.Visible = true
+    end
 end
-
-end
-
 
 function Window:ToggleVisibility()
     self.Visible = not self.Visible
     self.ScreenGui.Enabled = self.Visible
 end
 
-
 function Window:Close()
-    -- Clean up blur effect
-    if self.BlurEffect then
-        self.BlurEffect:Destroy()
+    -- Clean up connections
+    for _, connection in ipairs(self.Connections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
     end
 
+    -- Animate out and destroy
+    animate(self.Frame, {Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)}, 0.3, Enum.EasingStyle.Back)
 
--- Clean up connections
-for _, connection in ipairs(self.Connections) do
-    if connection and connection.Disconnect then
-        connection:Disconnect()
+    task.wait(0.4)
+    if self.ScreenGui then
+        pcall(function() self.ScreenGui:Destroy() end)
     end
 end
-
--- Animate out and destroy
-animate(self.Frame, {Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)}, 0.3, Enum.EasingStyle.Back)
-
-task.wait(0.4)
-if self.ScreenGui then
-    self.ScreenGui:Destroy()
-end
-
-end
-
 
 function Window:SetTheme(themeName)
     if Themes[themeName] then
         self.Theme = themeName
         self.Colors = Themes[themeName]
 
-
-    -- Update all UI elements with new theme
-    self.Frame.BackgroundColor3 = self.Colors.background
-    self.TitleBar.BackgroundColor3 = self.Colors.surface
-    self.TitleLabel.TextColor3 = self.Colors.text
-    
-    -- Update gradients
-    local titleGradient = self.TitleBar:FindFirstChildWhichIsA("UIGradient")
-    if titleGradient then
-        titleGradient.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, self.Colors.primary),
-            ColorSequenceKeypoint.new(1, self.Colors.accent)
-        }
+        -- Update all UI elements with new theme
+        self.Frame.BackgroundColor3 = self.Colors.background
+        self.TitleBar.BackgroundColor3 = self.Colors.surface
+        self.TitleLabel.TextColor3 = self.Colors.text
+        
+        -- Update gradients
+        local titleGradient = self.TitleBar:FindFirstChildWhichIsA("UIGradient")
+        if titleGradient then
+            titleGradient.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, self.Colors.primary),
+                ColorSequenceKeypoint.new(1, self.Colors.accent)
+            }
+        end
     end
 end
-
-end
-
 
 -- Enhanced Button Class
 local Button = {}
 Button.__index = Button
 
-
 function Button.new(parent, text, callback, options)
     options = options or {}
     local self = setmetatable({}, Button)
 
+    self.Text = text or "Button"
+    self.Callback = callback
+    self.Parent = parent
+    self.Colors = parent.Colors
+    self.Hovered = false
+    self.Style = options.style or "default"
+    self.Animated = options.animated ~= false
 
-self.Text = text or "Button"
-self.Callback = callback
-self.Parent = parent
-self.Colors = parent.Colors
-self.Hovered = false
-self.Style = options.style or "default"
-self.Animated = options.animated ~= false
-
-self:CreateUI(options)
-return self
-
+    self:CreateUI(options)
+    return self
 end
-
 
 function Button:CreateUI(options)
     self.Frame = createFrame(self.Parent.ContentFrame, "Button", {
@@ -849,304 +738,273 @@ function Button:CreateUI(options)
         LayoutOrder = options.order or 0
     })
 
+    -- Apply gradient
+    applyGradient(self.Frame, ColorSequence.new{
+        ColorSequenceKeypoint.new(0, self.Colors.primary),
+        ColorSequenceKeypoint.new(1, self.Colors.accent)
+    }, 45)
 
--- Apply gradient
-applyGradient(self.Frame, ColorSequence.new{
-    ColorSequenceKeypoint.new(0, self.Colors.primary),
-    ColorSequenceKeypoint.new(1, self.Colors.accent)
-}, 45)
+    applyCornerRadius(self.Frame, 6)
+    applyStroke(self.Frame, self.Colors.border, 1)
 
-applyCornerRadius(self.Frame, 6)
-applyStroke(self.Frame, self.Colors.border, 1)
+    self.Button = createTextButton(self.Frame, "TextButton", self.Text, {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Font = options.font or Config.DefaultFont,
+        TextSize = options.textSize or Config.DefaultTextSize
+    })
 
-self.Button = createTextButton(self.Frame, "TextButton", self.Text, {
-    Size = UDim2.new(1, 0, 1, 0),
-    BackgroundTransparency = 1,
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    Font = options.font or Config.DefaultFont,
-    TextSize = options.textSize or Config.DefaultTextSize
-})
-
--- Hover effects
-if self.Animated then
-    self.Button.MouseEnter:Connect(function()
-        self.Hovered = true
-        animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 42)}, 0.2)
-    end)
-    
-    self.Button.MouseLeave:Connect(function()
-        self.Hovered = false
-        animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 40)}, 0.2)
-    end)
-end
-
-self.Button.MouseButton1Click:Connect(function()
-    -- Click animation
+    -- Hover effects
     if self.Animated then
-        local originalSize = self.Frame.Size
-        animate(self.Frame, {Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.95, originalSize.Y.Scale, originalSize.Y.Offset)}, 0.1)
-        task.wait(0.1)
-        animate(self.Frame, {Size = originalSize}, 0.1)
+        self.Button.MouseEnter:Connect(function()
+            self.Hovered = true
+            animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 42)}, 0.2)
+        end)
+        
+        self.Button.MouseLeave:Connect(function()
+            self.Hovered = false
+            animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 40)}, 0.2)
+        end)
     end
-    
-    if self.Callback then
-        local success, errorMsg = pcall(self.Callback)
-        if not success then
-            warn("Swift: Button callback error: " .. tostring(errorMsg))
+
+    self.Button.MouseButton1Click:Connect(function()
+        -- Click animation
+        if self.Animated then
+            local originalSize = self.Frame.Size
+            animate(self.Frame, {Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.95, originalSize.Y.Scale, originalSize.Y.Offset)}, 0.1)
+            task.wait(0.1)
+            animate(self.Frame, {Size = originalSize}, 0.1)
         end
-    end
-end)
-
+        
+        if self.Callback then
+            local success, errorMsg = pcall(self.Callback)
+            if not success then
+                warn("Swift: Button callback error: " .. tostring(errorMsg))
+            end
+        end
+    end)
 end
-
 
 function Button:SetText(text)
     self.Text = text or ""
     self.Button.Text = self.Text
 end
 
-
-function Button:SetStyle(style)
-    self.Style = style
-    -- Update button appearance based on style
-end
-
-
 -- Notification System
 local NotificationSystem = {
     notifications = {},
     maxHeight = 200,
 
-
-show = function(title, message, notificationType, duration)
-    notificationType = notificationType or "info"
-    duration = duration or 4
-    
-    -- Remove old notifications if too many
-    while #NotificationSystem.notifications >= Config.MaxNotifications do
-        local oldNotification = table.remove(NotificationSystem.notifications, 1)
-        if oldNotification and oldNotification.close then
-            oldNotification.close()
+    show = function(title, message, notificationType, duration)
+        notificationType = notificationType or "info"
+        duration = duration or 4
+        
+        -- Remove old notifications if too many
+        while #NotificationSystem.notifications >= Config.MaxNotifications do
+            local oldNotification = table.remove(NotificationSystem.notifications, 1)
+            if oldNotification and oldNotification.close then
+                oldNotification.close()
+            end
         end
-    end
-    
-    local notification = {
-        title = title,
-        message = message,
-        type = notificationType,
-        duration = duration,
-        close = function() end
-    }
-    
-    NotificationSystem.create(notification)
-    table.insert(NotificationSystem.notifications, notification)
-    
-    return notification
-end,
+        
+        local notification = {
+            title = title,
+            message = message,
+            type = notificationType,
+            duration = duration,
+            close = function() end
+        }
+        
+        NotificationSystem.create(notification)
+        table.insert(NotificationSystem.notifications, notification)
+        
+        return notification
+    end,
 
-create = function(notification)
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = Security.generateRandomName("NotificationGui")
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ScreenGui.Parent = CoreGui or Players.LocalPlayer:WaitForChild("PlayerGui")
-    
-    local colors = Themes.dark
-    local typeColor = colors.primary
-    
-    if notification.type == "success" then
-        typeColor = colors.success
-    elseif notification.type == "warning" then
-        typeColor = colors.warning
-    elseif notification.type == "error" then
-        typeColor = colors.error
-    end
-    
-    -- Notification frame
-    local frame = createFrame(ScreenGui, "Notification", {
-        Size = UDim2.new(0, 350, 0, 80),
-        Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90))),
-        BackgroundColor3 = colors.surface,
-        BorderSizePixel = 0
-    })
-    
-    applyGradient(frame, ColorSequence.new{
-        ColorSequenceKeypoint.new(0, colors.surface),
-        ColorSequenceKeypoint.new(1, colors.background)
-    }, 180)
-    
-    applyCornerRadius(frame, 8)
-    applyStroke(frame, typeColor, 2)
-    
-    -- Icon
-    local iconText = notification.type == "success" and "\u2713" or 
-                    notification.type == "warning" and "\u26a0" or 
-                    notification.type == "error" and "\u2715" or "\u2139"
-    
-    local icon = createTextLabel(frame, "Icon", iconText, {
-        Size = UDim2.new(0, 30, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        TextColor3 = typeColor,
-        TextSize = 20,
-        Font = Enum.Font.GothamBold
-    })
-    
-    -- Title
-    local titleLabel = createTextLabel(frame, "Title", notification.title, {
-        Size = UDim2.new(1, -80, 0, 25),
-        Position = UDim2.new(0, 50, 0, 10),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextColor3 = colors.text,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14
-    })
-    
-    -- Message
-    local messageLabel = createTextLabel(frame, "Message", notification.message, {
-        Size = UDim2.new(1, -80, 0, 35),
-        Position = UDim2.new(0, 50, 0, 30),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-        TextColor3 = colors.textSecondary,
-        TextWrapped = true,
-        TextSize = 12
-    })
-    
-    -- Close button
-    local closeBtn = createTextButton(frame, "Close", "\u00d7", {
-        Size = UDim2.new(0, 20, 0, 20),
-        Position = UDim2.new(1, -25, 0, 5),
-        BackgroundTransparency = 1,
-        TextColor3 = colors.textSecondary,
-        TextSize = 16
-    })
-    
-    -- Animation in
-    frame.Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))
-    animate(frame, {Position = UDim2.new(1, -370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-    
-    -- Close function
-    local function close()
-        animate(frame, {Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-        task.wait(0.5)
-        if ScreenGui then
-            ScreenGui:Destroy()
+    create = function(notification)
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = Security.generateRandomName("NotificationGui")
+        ScreenGui.ResetOnSpawn = false
+        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        
+        -- Try CoreGui first, fallback to PlayerGui
+        local success = pcall(function()
+            ScreenGui.Parent = CoreGui
+        end)
+        
+        if not success then
+            ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
         end
+        
+        local colors = Themes.dark
+        local typeColor = colors.primary
+        
+        if notification.type == "success" then
+            typeColor = colors.success
+        elseif notification.type == "warning" then
+            typeColor = colors.warning
+        elseif notification.type == "error" then
+            typeColor = colors.error
+        end
+        
+        -- Notification frame
+        local frame = createFrame(ScreenGui, "Notification", {
+            Size = UDim2.new(0, 350, 0, 80),
+            Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90))),
+            BackgroundColor3 = colors.surface,
+            BorderSizePixel = 0
+        })
+        
+        applyGradient(frame, ColorSequence.new{
+            ColorSequenceKeypoint.new(0, colors.surface),
+            ColorSequenceKeypoint.new(1, colors.background)
+        }, 180)
+        
+        applyCornerRadius(frame, 8)
+        applyStroke(frame, typeColor, 2)
+        
+        -- Icon
+        local iconText = notification.type == "success" and "✓" or 
+                        notification.type == "warning" and "⚠" or 
+                        notification.type == "error" and "✕" or "ℹ"
+        
+        local icon = createTextLabel(frame, "Icon", iconText, {
+            Size = UDim2.new(0, 30, 1, 0),
+            Position = UDim2.new(0, 10, 0, 0),
+            TextColor3 = typeColor,
+            TextSize = 20,
+            Font = Enum.Font.GothamBold
+        })
+        
+        -- Title
+        local titleLabel = createTextLabel(frame, "Title", notification.title, {
+            Size = UDim2.new(1, -80, 0, 25),
+            Position = UDim2.new(0, 50, 0, 10),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextColor3 = colors.text,
+            Font = Enum.Font.GothamBold,
+            TextSize = 14
+        })
+        
+        -- Message
+        local messageLabel = createTextLabel(frame, "Message", notification.message, {
+            Size = UDim2.new(1, -80, 0, 35),
+            Position = UDim2.new(0, 50, 0, 30),
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            TextColor3 = colors.textSecondary,
+            TextWrapped = true,
+            TextSize = 12
+        })
+        
+        -- Close button
+        local closeBtn = createTextButton(frame, "Close", "×", {
+            Size = UDim2.new(0, 20, 0, 20),
+            Position = UDim2.new(1, -25, 0, 5),
+            BackgroundTransparency = 1,
+            TextColor3 = colors.textSecondary,
+            TextSize = 16
+        })
+        
+        -- Animation in
+        frame.Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))
+        animate(frame, {Position = UDim2.new(1, -370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
+        
+        -- Close function
+        local function close()
+            animate(frame, {Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
+            task.wait(0.5)
+            if ScreenGui then
+                pcall(function() ScreenGui:Destroy() end)
+            end
+        end
+        
+        notification.close = close
+        notification.gui = ScreenGui
+        
+        -- Auto close
+        task.spawn(function()
+            task.wait(notification.duration)
+            close()
+        end)
+        
+        -- Manual close
+        closeBtn.MouseButton1Click:Connect(close)
+        
+        MemoryManager.track(ScreenGui, "notification")
     end
-    
-    notification.close = close
-    notification.gui = ScreenGui
-    
-    -- Auto close
-    task.spawn(function()
-        task.wait(notification.duration)
-        close()
-    end)
-    
-    -- Manual close
-    closeBtn.MouseButton1Click:Connect(close)
-    
-    MemoryManager.track(ScreenGui, "notification")
-end
-
 }
-
 
 -- Keybind System
 local KeybindSystem = {
     keybinds = {},
     connections = {},
 
-
-register = function(key, modifiers, callback, description)
-    modifiers = modifiers or {}
-    
-    local keybind = {
-        key = key,
-        modifiers = modifiers,
-        callback = callback,
-        description = description or "",
-        enabled = true
-    }
-    
-    table.insert(KeybindSystem.keybinds, keybind)
-    
-    if #KeybindSystem.connections == 0 then
-        KeybindSystem.startListening()
-    end
-    
-    return keybind
-end,
-
-startListening = function()
-    local UserInputService = GetService("UserInputService")
-    if not UserInputService then return end
-    
-    local connection = MemoryManager.trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
+    register = function(key, callback, description)
+        local keybind = {
+            key = key,
+            callback = callback,
+            description = description or "",
+            enabled = true
+        }
         
-        for _, keybind in ipairs(KeybindSystem.keybinds) do
-            if keybind.enabled and input.KeyCode == keybind.key then
-                -- Check modifiers
-                local modifiersMatch = true
-                
-                if keybind.ctrl and not (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
-                    modifiersMatch = false
-                end
-                
-                if keybind.shift and not (UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)) then
-                    modifiersMatch = false
-                end
-                
-                if keybind.alt and not (UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)) then
-                    modifiersMatch = false
-                end
-                
-                if modifiersMatch then
+        table.insert(KeybindSystem.keybinds, keybind)
+        
+        if #KeybindSystem.connections == 0 then
+            KeybindSystem.startListening()
+        end
+        
+        return keybind
+    end,
+
+    startListening = function()
+        if not UserInputService then return end
+        
+        local connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            for _, keybind in ipairs(KeybindSystem.keybinds) do
+                if keybind.enabled and input.KeyCode == keybind.key then
                     local success, errorMsg = pcall(keybind.callback)
                     if not success then
                         warn("Swift: Keybind callback error: " .. tostring(errorMsg))
                     end
                 end
             end
-        end
-    end))
-    
-    table.insert(KeybindSystem.connections, connection)
-end,
+        end)
+        
+        table.insert(KeybindSystem.connections, MemoryManager.trackConnection(connection))
+    end,
 
-unregister = function(keybind)
-    for i, kb in ipairs(KeybindSystem.keybinds) do
-        if kb == keybind then
-            table.remove(KeybindSystem.keybinds, i)
-            break
+    unregister = function(keybind)
+        for i, kb in ipairs(KeybindSystem.keybinds) do
+            if kb == keybind then
+                table.remove(KeybindSystem.keybinds, i)
+                break
+            end
         end
+    end,
+
+    cleanup = function()
+        for _, connection in ipairs(KeybindSystem.connections) do
+            if connection then
+                pcall(function() connection:Disconnect() end)
+            end
+        end
+        KeybindSystem.connections = {}
+        KeybindSystem.keybinds = {}
     end
-end,
-
-cleanup = function()
-    for _, connection in ipairs(KeybindSystem.connections) do
-        if connection then
-            connection:Disconnect()
-        end
-    end
-    KeybindSystem.connections = {}
-    KeybindSystem.keybinds = {}
-end
-
 }
-
 
 -- Swift API
 function Swift.CreateWindow(title, options)
     return Window.new(title, options)
 end
 
-
 function Swift.CreateButton(parent, text, callback, options)
     return Button.new(parent, text, callback, options)
 end
-
 
 function Swift.CreateLabel(parent, text, options)
     options = options or {}
@@ -1161,16 +1019,13 @@ function Swift.CreateLabel(parent, text, options)
     return label
 end
 
-
 function Swift.ShowNotification(title, message, notificationType, duration)
     return NotificationSystem.show(title, message, notificationType, duration)
 end
 
-
-function Swift.RegisterKeybind(key, modifiers, callback, description)
-    return KeybindSystem.register(key, modifiers, callback, description)
+function Swift.RegisterKeybind(key, callback, description)
+    return KeybindSystem.register(key, callback, description)
 end
-
 
 function Swift.SetTheme(themeName)
     if Themes[themeName] then
@@ -1180,7 +1035,6 @@ function Swift.SetTheme(themeName)
     end
 end
 
-
 function Swift.GetThemes()
     local themeNames = {}
     for name, _ in pairs(Themes) do
@@ -1189,24 +1043,20 @@ function Swift.GetThemes()
     return themeNames
 end
 
-
 function Swift.SetConfig(newConfig)
     if type(newConfig) ~= "table" then
         warn("Swift: Config must be a table")
         return
     end
 
-
-for key, value in pairs(newConfig) do
-    if Config[key] ~= nil then
-        Config[key] = value
-    else
-        warn("Swift: Unknown config key: " .. tostring(key))
+    for key, value in pairs(newConfig) do
+        if Config[key] ~= nil then
+            Config[key] = value
+        else
+            warn("Swift: Unknown config key: " .. tostring(key))
+        end
     end
 end
-
-end
-
 
 function Swift.GetConfig()
     return {
@@ -1223,14 +1073,12 @@ function Swift.GetConfig()
     }
 end
 
-
 function Swift.Cleanup()
     MemoryManager.cleanupAll()
     KeybindSystem.cleanup()
     NotificationSystem.notifications = {}
     AnimationSystem.animations = {}
 end
-
 
 function Swift.GetInfo()
     return {
@@ -1243,17 +1091,16 @@ function Swift.GetInfo()
     }
 end
 
-
 -- Auto-cleanup on game end
-if Players then
-    Players.LocalPlayer.CharacterRemoving:Connect(function()
-        Swift.Cleanup()
+if Players and Players.LocalPlayer then
+    pcall(function()
+        Players.LocalPlayer.CharacterRemoving:Connect(function()
+            Swift.Cleanup()
+        end)
     end)
 end
 
-
 -- Global export
 _G.Swift = Swift
-
 
 return Swift
