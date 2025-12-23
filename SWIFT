@@ -45,162 +45,159 @@ local HttpService = GetService("HttpService")
 local StarterGui = GetService("StarterGui")
 
 -- Security utilities
-local Security = {
-    randomNames = {},
-    nameCounter = 0,
+local Security = {}
+Security.randomNames = {}
+Security.nameCounter = 0
 
-    generateRandomName = function(prefix)
-        Security.nameCounter = Security.nameCounter + 1
-        local randomStr = string.format("%X", math.random(0x1000, 0xFFFF))
-        return (prefix or "Swift") .. "_" .. randomStr .. "_" .. Security.nameCounter
-    end,
+function Security.generateRandomName(prefix)
+    Security.nameCounter = Security.nameCounter + 1
+    local randomStr = string.format("%X", math.random(0x1000, 0xFFFF))
+    return (prefix or "Swift") .. "_" .. randomStr .. "_" .. Security.nameCounter
+end
 
-    obfuscateProperty = function(obj, properties)
-        if not AntiDetect.enabled then return end
-        
-        for _, prop in ipairs(properties) do
-            local randomProp = Security.generateRandomName("prop")
-            obj[randomProp] = obj[prop]
-            obj[prop] = nil
-        end
+function Security.obfuscateProperty(obj, properties)
+    if not AntiDetect.enabled then return end
+    
+    for _, prop in ipairs(properties) do
+        local randomProp = Security.generateRandomName("prop")
+        obj[randomProp] = obj[prop]
+        obj[prop] = nil
     end
-}
+end
 
 -- Memory management
-local MemoryManager = {
-    objects = {},
-    connections = {},
-    maxObjects = 500,
+local MemoryManager = {}
+MemoryManager.objects = {}
+MemoryManager.connections = {}
+MemoryManager.maxObjects = 500
 
-    track = function(obj, type)
-        if #MemoryManager.objects >= MemoryManager.maxObjects then
-            MemoryManager.cleanup()
-        end
-        
-        table.insert(MemoryManager.objects, {
-            object = obj,
-            type = type or "unknown",
-            created = tick()
-        })
-        return obj
-    end,
-
-    trackConnection = function(connection)
-        table.insert(MemoryManager.connections, connection)
-        return connection
-    end,
-
-    cleanup = function()
-        local toRemove = {}
-        
-        for i, obj in ipairs(MemoryManager.objects) do
-            if obj.object and obj.object.Parent == nil then
-                table.insert(toRemove, i)
-            end
-        end
-        
-        for i = #toRemove, 1, -1 do
-            table.remove(MemoryManager.objects, toRemove[i])
-        end
-    end,
-
-    cleanupAll = function()
-        for _, connection in ipairs(MemoryManager.connections) do
-            if connection and connection.Disconnect then
-                pcall(function() connection:Disconnect() end)
-            end
-        end
-        
-        for _, obj in ipairs(MemoryManager.objects) do
-            if obj.object and obj.object.Destroy then
-                pcall(function() obj.object:Destroy() end)
-            end
-        end
-        
-        MemoryManager.objects = {}
-        MemoryManager.connections = {}
+function MemoryManager.track(obj, type)
+    if #MemoryManager.objects >= MemoryManager.maxObjects then
+        MemoryManager.cleanup()
     end
-}
+    
+    table.insert(MemoryManager.objects, {
+        object = obj,
+        type = type or "unknown",
+        created = tick()
+    })
+    return obj
+end
+
+function MemoryManager.trackConnection(connection)
+    table.insert(MemoryManager.connections, connection)
+    return connection
+end
+
+function MemoryManager.cleanup()
+    local toRemove = {}
+    
+    for i, obj in ipairs(MemoryManager.objects) do
+        if obj.object and obj.object.Parent == nil then
+            table.insert(toRemove, i)
+        end
+    end
+    
+    for i = #toRemove, 1, -1 do
+        table.remove(MemoryManager.objects, toRemove[i])
+    end
+end
+
+function MemoryManager.cleanupAll()
+    for _, connection in ipairs(MemoryManager.connections) do
+        if connection and connection.Disconnect then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    
+    for _, obj in ipairs(MemoryManager.objects) do
+        if obj.object and obj.object.Destroy then
+            pcall(function() obj.object:Destroy() end)
+        end
+    end
+    
+    MemoryManager.objects = {}
+    MemoryManager.connections = {}
+end
 
 -- Advanced animation system
-local AnimationSystem = {
-    animations = {},
-    fps = 60,
+local AnimationSystem = {}
+AnimationSystem.animations = {}
+AnimationSystem.fps = 60
 
-    create = function(obj, info, goal)
-        local animation = {
-            object = obj,
-            info = info,
-            goal = goal,
-            startTime = tick(),
-            connection = nil
-        }
-        
-        if TweenService then
-            local tween = TweenService:Create(obj, info, goal)
-            animation.tween = tween
-            animation.connection = MemoryManager.trackConnection(tween.Completed:Connect(function()
-                AnimationSystem.remove(animation)
-            end))
-            tween:Play()
-        else
-            -- Fallback animation
-            animation.connection = MemoryManager.trackConnection(RunService.Heartbeat:Connect(function()
-                AnimationSystem.update(animation)
-            end))
-        end
-        
-        table.insert(AnimationSystem.animations, animation)
-        return animation
-    end,
-
-    update = function(animation)
-        if not animation.object or not animation.object.Parent then
+function AnimationSystem.create(obj, info, goal)
+    local animation = {
+        object = obj,
+        info = info,
+        goal = goal,
+        startTime = tick(),
+        connection = nil
+    }
+    
+    if TweenService then
+        local tween = TweenService:Create(obj, info, goal)
+        animation.tween = tween
+        animation.connection = MemoryManager.trackConnection(tween.Completed:Connect(function()
             AnimationSystem.remove(animation)
-            return
-        end
-        
-        local elapsed = tick() - animation.startTime
-        local progress = math.min(elapsed / animation.info.Time, 1)
-        
-        for property, target in pairs(animation.goal) do
-            local current = animation.object[property]
-            if typeof(current) == "UDim2" then
-                animation.object[property] = UDim2.new(
-                    current.X.Scale + (target.X.Scale - current.X.Scale) * progress,
-                    current.X.Offset + (target.X.Offset - current.X.Offset) * progress,
-                    current.Y.Scale + (target.Y.Scale - current.Y.Scale) * progress,
-                    current.Y.Offset + (target.Y.Offset - current.Y.Offset) * progress
-                )
-            elseif typeof(current) == "Color3" then
-                animation.object[property] = Color3.new(
-                    current.R + (target.R - current.R) * progress,
-                    current.G + (target.G - current.G) * progress,
-                    current.B + (target.B - current.B) * progress
-                )
-            elseif typeof(current) == "number" then
-                animation.object[property] = current + (target - current) * progress
-            end
-        end
-        
-        if progress >= 1 then
-            AnimationSystem.remove(animation)
-        end
-    end,
+        end))
+        tween:Play()
+    else
+        -- Fallback animation
+        animation.connection = MemoryManager.trackConnection(RunService.Heartbeat:Connect(function()
+            AnimationSystem.update(animation)
+        end))
+    end
+    
+    table.insert(AnimationSystem.animations, animation)
+    return animation
+end
 
-    remove = function(animation)
-        if animation.connection then
-            pcall(function() animation.connection:Disconnect() end)
-        end
-        
-        for i, anim in ipairs(AnimationSystem.animations) do
-            if anim == animation then
-                table.remove(AnimationSystem.animations, i)
-                break
-            end
+function AnimationSystem.update(animation)
+    if not animation.object or not animation.object.Parent then
+        AnimationSystem.remove(animation)
+        return
+    end
+    
+    local elapsed = tick() - animation.startTime
+    local progress = math.min(elapsed / animation.info.Time, 1)
+    
+    for property, target in pairs(animation.goal) do
+        local current = animation.object[property]
+        if typeof(current) == "UDim2" then
+            animation.object[property] = UDim2.new(
+                current.X.Scale + (target.X.Scale - current.X.Scale) * progress,
+                current.X.Offset + (target.X.Offset - current.X.Offset) * progress,
+                current.Y.Scale + (target.Y.Scale - current.Y.Scale) * progress,
+                current.Y.Offset + (target.Y.Offset - current.Y.Offset) * progress
+            )
+        elseif typeof(current) == "Color3" then
+            animation.object[property] = Color3.new(
+                current.R + (target.R - current.R) * progress,
+                current.G + (target.G - current.G) * progress,
+                current.B + (target.B - current.B) * progress
+            )
+        elseif typeof(current) == "number" then
+            animation.object[property] = current + (target - current) * progress
         end
     end
-}
+    
+    if progress >= 1 then
+        AnimationSystem.remove(animation)
+    end
+end
+
+function AnimationSystem.remove(animation)
+    if animation.connection then
+        pcall(function() animation.connection:Disconnect() end)
+    end
+    
+    for i, anim in ipairs(AnimationSystem.animations) do
+        if anim == animation then
+            table.remove(AnimationSystem.animations, i)
+            break
+        end
+    end
+end
 
 -- Main Swift Library
 local Swift = {}
@@ -792,210 +789,208 @@ function Button:SetText(text)
 end
 
 -- Notification System
-local NotificationSystem = {
-    notifications = {},
-    maxHeight = 200,
+local NotificationSystem = {}
+NotificationSystem.notifications = {}
+NotificationSystem.maxHeight = 200
 
-    show = function(title, message, notificationType, duration)
-        notificationType = notificationType or "info"
-        duration = duration or 4
-        
-        -- Remove old notifications if too many
-        while #NotificationSystem.notifications >= Config.MaxNotifications do
-            local oldNotification = table.remove(NotificationSystem.notifications, 1)
-            if oldNotification and oldNotification.close then
-                oldNotification.close()
-            end
+function NotificationSystem.show(title, message, notificationType, duration)
+    notificationType = notificationType or "info"
+    duration = duration or 4
+    
+    -- Remove old notifications if too many
+    while #NotificationSystem.notifications >= Config.MaxNotifications do
+        local oldNotification = table.remove(NotificationSystem.notifications, 1)
+        if oldNotification and oldNotification.close then
+            oldNotification.close()
         end
-        
-        local notification = {
-            title = title,
-            message = message,
-            type = notificationType,
-            duration = duration,
-            close = function() end
-        }
-        
-        NotificationSystem.create(notification)
-        table.insert(NotificationSystem.notifications, notification)
-        
-        return notification
-    end,
-
-    create = function(notification)
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = Security.generateRandomName("NotificationGui")
-        ScreenGui.ResetOnSpawn = false
-        ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-        
-        -- Try CoreGui first, fallback to PlayerGui
-        local success = pcall(function()
-            ScreenGui.Parent = CoreGui
-        end)
-        
-        if not success then
-            ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-        end
-        
-        local colors = Themes.dark
-        local typeColor = colors.primary
-        
-        if notification.type == "success" then
-            typeColor = colors.success
-        elseif notification.type == "warning" then
-            typeColor = colors.warning
-        elseif notification.type == "error" then
-            typeColor = colors.error
-        end
-        
-        -- Notification frame
-        local frame = createFrame(ScreenGui, "Notification", {
-            Size = UDim2.new(0, 350, 0, 80),
-            Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90))),
-            BackgroundColor3 = colors.surface,
-            BorderSizePixel = 0
-        })
-        
-        applyGradient(frame, ColorSequence.new{
-            ColorSequenceKeypoint.new(0, colors.surface),
-            ColorSequenceKeypoint.new(1, colors.background)
-        }, 180)
-        
-        applyCornerRadius(frame, 8)
-        applyStroke(frame, typeColor, 2)
-        
-        -- Icon
-        local iconText = notification.type == "success" and "✓" or 
-                        notification.type == "warning" and "⚠" or 
-                        notification.type == "error" and "✕" or "ℹ"
-        
-        local icon = createTextLabel(frame, "Icon", iconText, {
-            Size = UDim2.new(0, 30, 1, 0),
-            Position = UDim2.new(0, 10, 0, 0),
-            TextColor3 = typeColor,
-            TextSize = 20,
-            Font = Enum.Font.GothamBold
-        })
-        
-        -- Title
-        local titleLabel = createTextLabel(frame, "Title", notification.title, {
-            Size = UDim2.new(1, -80, 0, 25),
-            Position = UDim2.new(0, 50, 0, 10),
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextColor3 = colors.text,
-            Font = Enum.Font.GothamBold,
-            TextSize = 14
-        })
-        
-        -- Message
-        local messageLabel = createTextLabel(frame, "Message", notification.message, {
-            Size = UDim2.new(1, -80, 0, 35),
-            Position = UDim2.new(0, 50, 0, 30),
-            TextXAlignment = Enum.TextXAlignment.Left,
-            TextYAlignment = Enum.TextYAlignment.Top,
-            TextColor3 = colors.textSecondary,
-            TextWrapped = true,
-            TextSize = 12
-        })
-        
-        -- Close button
-        local closeBtn = createTextButton(frame, "Close", "×", {
-            Size = UDim2.new(0, 20, 0, 20),
-            Position = UDim2.new(1, -25, 0, 5),
-            BackgroundTransparency = 1,
-            TextColor3 = colors.textSecondary,
-            TextSize = 16
-        })
-        
-        -- Animation in
-        frame.Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))
-        animate(frame, {Position = UDim2.new(1, -370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-        
-        -- Close function
-        local function close()
-            animate(frame, {Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-            task.wait(0.5)
-            if ScreenGui then
-                pcall(function() ScreenGui:Destroy() end)
-            end
-        end
-        
-        notification.close = close
-        notification.gui = ScreenGui
-        
-        -- Auto close
-        task.spawn(function()
-            task.wait(notification.duration)
-            close()
-        end)
-        
-        -- Manual close
-        closeBtn.MouseButton1Click:Connect(close)
-        
-        MemoryManager.track(ScreenGui, "notification")
     end
-}
+    
+    local notification = {
+        title = title,
+        message = message,
+        type = notificationType,
+        duration = duration,
+        close = function() end
+    }
+    
+    NotificationSystem.create(notification)
+    table.insert(NotificationSystem.notifications, notification)
+    
+    return notification
+end
+
+function NotificationSystem.create(notification)
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = Security.generateRandomName("NotificationGui")
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Try CoreGui first, fallback to PlayerGui
+    local success = pcall(function()
+        ScreenGui.Parent = CoreGui
+    end)
+    
+    if not success then
+        ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+    end
+    
+    local colors = Themes.dark
+    local typeColor = colors.primary
+    
+    if notification.type == "success" then
+        typeColor = colors.success
+    elseif notification.type == "warning" then
+        typeColor = colors.warning
+    elseif notification.type == "error" then
+        typeColor = colors.error
+    end
+    
+    -- Notification frame
+    local frame = createFrame(ScreenGui, "Notification", {
+        Size = UDim2.new(0, 350, 0, 80),
+        Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90))),
+        BackgroundColor3 = colors.surface,
+        BorderSizePixel = 0
+    })
+    
+    applyGradient(frame, ColorSequence.new{
+        ColorSequenceKeypoint.new(0, colors.surface),
+        ColorSequenceKeypoint.new(1, colors.background)
+    }, 180)
+    
+    applyCornerRadius(frame, 8)
+    applyStroke(frame, typeColor, 2)
+    
+    -- Icon
+    local iconText = notification.type == "success" and "✓" or 
+                    notification.type == "warning" and "⚠" or 
+                    notification.type == "error" and "✕" or "ℹ"
+    
+    local icon = createTextLabel(frame, "Icon", iconText, {
+        Size = UDim2.new(0, 30, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
+        TextColor3 = typeColor,
+        TextSize = 20,
+        Font = Enum.Font.GothamBold
+    })
+    
+    -- Title
+    local titleLabel = createTextLabel(frame, "Title", notification.title, {
+        Size = UDim2.new(1, -80, 0, 25),
+        Position = UDim2.new(0, 50, 0, 10),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextColor3 = colors.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    })
+    
+    -- Message
+    local messageLabel = createTextLabel(frame, "Message", notification.message, {
+        Size = UDim2.new(1, -80, 0, 35),
+        Position = UDim2.new(0, 50, 0, 30),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        TextColor3 = colors.textSecondary,
+        TextWrapped = true,
+        TextSize = 12
+    })
+    
+    -- Close button
+    local closeBtn = createTextButton(frame, "Close", "×", {
+        Size = UDim2.new(0, 20, 0, 20),
+        Position = UDim2.new(1, -25, 0, 5),
+        BackgroundTransparency = 1,
+        TextColor3 = colors.textSecondary,
+        TextSize = 16
+    })
+    
+    -- Animation in
+    frame.Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))
+    animate(frame, {Position = UDim2.new(1, -370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
+    
+    -- Close function
+    local function close()
+        animate(frame, {Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
+        task.wait(0.5)
+        if ScreenGui then
+            pcall(function() ScreenGui:Destroy() end)
+        end
+    end
+    
+    notification.close = close
+    notification.gui = ScreenGui
+    
+    -- Auto close
+    task.spawn(function()
+        task.wait(notification.duration)
+        close()
+    end)
+    
+    -- Manual close
+    closeBtn.MouseButton1Click:Connect(close)
+    
+    MemoryManager.track(ScreenGui, "notification")
+end
 
 -- Keybind System
-local KeybindSystem = {
-    keybinds = {},
-    connections = {},
+local KeybindSystem = {}
+KeybindSystem.keybinds = {}
+KeybindSystem.connections = {}
 
-    register = function(key, callback, description)
-        local keybind = {
-            key = key,
-            callback = callback,
-            description = description or "",
-            enabled = true
-        }
-        
-        table.insert(KeybindSystem.keybinds, keybind)
-        
-        if #KeybindSystem.connections == 0 then
-            KeybindSystem.startListening()
-        end
-        
-        return keybind
-    end,
+function KeybindSystem.register(key, callback, description)
+    local keybind = {
+        key = key,
+        callback = callback,
+        description = description or "",
+        enabled = true
+    }
+    
+    table.insert(KeybindSystem.keybinds, keybind)
+    
+    if #KeybindSystem.connections == 0 then
+        KeybindSystem.startListening()
+    end
+    
+    return keybind
+end
 
-    startListening = function()
-        if not UserInputService then return end
+function KeybindSystem.startListening()
+    if not UserInputService then return end
+    
+    local connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
         
-        local connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            
-            for _, keybind in ipairs(KeybindSystem.keybinds) do
-                if keybind.enabled and input.KeyCode == keybind.key then
-                    local success, errorMsg = pcall(keybind.callback)
-                    if not success then
-                        warn("Swift: Keybind callback error: " .. tostring(errorMsg))
-                    end
+        for _, keybind in ipairs(KeybindSystem.keybinds) do
+            if keybind.enabled and input.KeyCode == keybind.key then
+                local success, errorMsg = pcall(keybind.callback)
+                if not success then
+                    warn("Swift: Keybind callback error: " .. tostring(errorMsg))
                 end
             end
-        end)
-        
-        table.insert(KeybindSystem.connections, MemoryManager.trackConnection(connection))
-    end,
-
-    unregister = function(keybind)
-        for i, kb in ipairs(KeybindSystem.keybinds) do
-            if kb == keybind then
-                table.remove(KeybindSystem.keybinds, i)
-                break
-            end
         end
-    end,
+    end)
+    
+    table.insert(KeybindSystem.connections, MemoryManager.trackConnection(connection))
+end
 
-    cleanup = function()
-        for _, connection in ipairs(KeybindSystem.connections) do
-            if connection then
-                pcall(function() connection:Disconnect() end)
-            end
+function KeybindSystem.unregister(keybind)
+    for i, kb in ipairs(KeybindSystem.keybinds) do
+        if kb == keybind then
+            table.remove(KeybindSystem.keybinds, i)
+            break
         end
-        KeybindSystem.connections = {}
-        KeybindSystem.keybinds = {}
     end
-}
+end
+
+function KeybindSystem.cleanup()
+    for _, connection in ipairs(KeybindSystem.connections) do
+        if connection then
+            pcall(function() connection:Disconnect() end)
+        end
+    end
+    KeybindSystem.connections = {}
+    KeybindSystem.keybinds = {}
+end
 
 -- Swift API
 function Swift.CreateWindow(title, options)
