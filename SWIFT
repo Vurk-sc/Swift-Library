@@ -1,1090 +1,164 @@
---[[
-    SWIFT UI LIBRARY
-    Version: 2.0.1
-    Author: Ist5208
-]]
+-- Global Services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
--- Environment detection and compatibility
-local isExploit = (syn and syn.queue_on_teleport) or (getexecutorname and true) or false
-local executorName = getexecutorname and getexecutorname() or "Unknown"
+local Library = {}
 
--- Anti-detection layer
-local AntiDetect = {
-    enabled = true,
-    method = "subtle",
-    obfuscationLevel = 1
-}
-
--- Service getters with fallback
-local function GetService(serviceName)
-    local success, service = pcall(function()
-        return game:GetService(serviceName)
-    end)
-    return success and service or nil
+-- Helper function for smooth animations
+local function Tween(obj, info, goal)
+    return TweenService:Create(obj, TweenInfo.new(info), goal):Play()
 end
 
--- Core services
-local Players = GetService("Players")
-local UserInputService = GetService("UserInputService")
-local TweenService = GetService("TweenService")
-local RunService = GetService("RunService")
-local CoreGui = GetService("CoreGui")
-local GuiService = GetService("GuiService")
-local HttpService = GetService("HttpService")
-local StarterGui = GetService("StarterGui")
-
--- Security utilities
-local Security = {}
-Security.randomNames = {}
-Security.nameCounter = 0
-
-function Security.generateRandomName(prefix)
-    Security.nameCounter = Security.nameCounter + 1
-    local randomStr = string.format("%X", math.random(0x1000, 0xFFFF))
-    return (prefix or "Swift") .. "_" .. randomStr .. "_" .. Security.nameCounter
-end
-
-function Security.obfuscateProperty(obj, properties)
-    if not AntiDetect.enabled then return end
-    
-    for _, prop in ipairs(properties) do
-        local randomProp = Security.generateRandomName("prop")
-        obj[randomProp] = obj[prop]
-        obj[prop] = nil
-    end
-end
-
--- Memory management
-local MemoryManager = {}
-MemoryManager.objects = {}
-MemoryManager.connections = {}
-MemoryManager.maxObjects = 500
-
-function MemoryManager.track(obj, type)
-    if #MemoryManager.objects >= MemoryManager.maxObjects then
-        MemoryManager.cleanup()
-    end
-    
-    table.insert(MemoryManager.objects, {
-        object = obj,
-        type = type or "unknown",
-        created = tick()
-    })
-    return obj
-end
-
-function MemoryManager.trackConnection(connection)
-    table.insert(MemoryManager.connections, connection)
-    return connection
-end
-
-function MemoryManager.cleanup()
-    local toRemove = {}
-    
-    for i, obj in ipairs(MemoryManager.objects) do
-        if obj.object and obj.object.Parent == nil then
-            table.insert(toRemove, i)
-        end
-    end
-    
-    for i = #toRemove, 1, -1 do
-        table.remove(MemoryManager.objects, toRemove[i])
-    end
-end
-
-function MemoryManager.cleanupAll()
-    for _, connection in ipairs(MemoryManager.connections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    
-    for _, obj in ipairs(MemoryManager.objects) do
-        if obj.object and obj.object.Destroy then
-            pcall(function() obj.object:Destroy() end)
-        end
-    end
-    
-    MemoryManager.objects = {}
-    MemoryManager.connections = {}
-end
-
--- Advanced animation system
-local AnimationSystem = {}
-AnimationSystem.animations = {}
-AnimationSystem.fps = 60
-
-function AnimationSystem.create(obj, info, goal)
-    local animation = {
-        object = obj,
-        info = info,
-        goal = goal,
-        startTime = tick(),
-        connection = nil
-    }
-    
-    if TweenService then
-        local tween = TweenService:Create(obj, info, goal)
-        animation.tween = tween
-        animation.connection = MemoryManager.trackConnection(tween.Completed:Connect(function()
-            AnimationSystem.remove(animation)
-        end))
-        tween:Play()
-    else
-        -- Fallback animation
-        animation.connection = MemoryManager.trackConnection(RunService.Heartbeat:Connect(function()
-            AnimationSystem.update(animation)
-        end))
-    end
-    
-    table.insert(AnimationSystem.animations, animation)
-    return animation
-end
-
-function AnimationSystem.update(animation)
-    if not animation.object or not animation.object.Parent then
-        AnimationSystem.remove(animation)
-        return
-    end
-    
-    local elapsed = tick() - animation.startTime
-    local progress = math.min(elapsed / animation.info.Time, 1)
-    
-    for property, target in pairs(animation.goal) do
-        local current = animation.object[property]
-        if typeof(current) == "UDim2" then
-            animation.object[property] = UDim2.new(
-                current.X.Scale + (target.X.Scale - current.X.Scale) * progress,
-                current.X.Offset + (target.X.Offset - current.X.Offset) * progress,
-                current.Y.Scale + (target.Y.Scale - current.Y.Scale) * progress,
-                current.Y.Offset + (target.Y.Offset - current.Y.Offset) * progress
-            )
-        elseif typeof(current) == "Color3" then
-            animation.object[property] = Color3.new(
-                current.R + (target.R - current.R) * progress,
-                current.G + (target.G - current.G) * progress,
-                current.B + (target.B - current.B) * progress
-            )
-        elseif typeof(current) == "number" then
-            animation.object[property] = current + (target - current) * progress
-        end
-    end
-    
-    if progress >= 1 then
-        AnimationSystem.remove(animation)
-    end
-end
-
-function AnimationSystem.remove(animation)
-    if animation.connection then
-        pcall(function() animation.connection:Disconnect() end)
-    end
-    
-    for i, anim in ipairs(AnimationSystem.animations) do
-        if anim == animation then
-            table.remove(AnimationSystem.animations, i)
-            break
-        end
-    end
-end
-
--- Main Swift Library
-local Swift = {}
-Swift.Version = "2.0.1-Exploit"
-Swift.isExploit = isExploit
-Swift.executorName = executorName
-
--- Configuration
-local Config = {
-    DefaultFont = Enum.Font.GothamBold,
-    DefaultTextSize = 14,
-    DefaultCornerRadius = 8,
-    AnimationSpeed = 0.3,
-    DefaultTheme = "dark",
-    Padding = 8,
-    BlurSize = 24,
-    MaxNotifications = 5,
-    AutoCleanup = true,
-    AntiDetect = AntiDetect.enabled,
-    MobileMode = false,
-    FPS = 60
-}
-
--- Enhanced color palettes with gradients
-local Themes = {
-    dark = {
-        background = Color3.fromRGB(25, 25, 25),
-        surface = Color3.fromRGB(40, 40, 40),
-        primary = Color3.fromRGB(66, 135, 245),
-        accent = Color3.fromRGB(255, 107, 107),
-        text = Color3.fromRGB(255, 255, 255),
-        textSecondary = Color3.fromRGB(170, 170, 170),
-        border = Color3.fromRGB(60, 60, 60),
-        success = Color3.fromRGB(76, 175, 80),
-        warning = Color3.fromRGB(255, 193, 7),
-        error = Color3.fromRGB(244, 67, 54),
-        gradientStart = Color3.fromRGB(45, 45, 45),
-        gradientEnd = Color3.fromRGB(30, 30, 30),
-        shadow = Color3.fromRGB(0, 0, 0)
-    },
-    light = {
-        background = Color3.fromRGB(250, 250, 250),
-        surface = Color3.fromRGB(255, 255, 255),
-        primary = Color3.fromRGB(33, 150, 243),
-        accent = Color3.fromRGB(233, 30, 99),
-        text = Color3.fromRGB(33, 33, 33),
-        textSecondary = Color3.fromRGB(117, 117, 117),
-        border = Color3.fromRGB(200, 200, 200),
-        success = Color3.fromRGB(76, 175, 80),
-        warning = Color3.fromRGB(255, 193, 7),
-        error = Color3.fromRGB(244, 67, 54),
-        gradientStart = Color3.fromRGB(255, 255, 255),
-        gradientEnd = Color3.fromRGB(240, 240, 240),
-        shadow = Color3.fromRGB(100, 100, 100)
-    },
-    neon = {
-        background = Color3.fromRGB(10, 10, 20),
-        surface = Color3.fromRGB(20, 20, 40),
-        primary = Color3.fromRGB(0, 255, 255),
-        accent = Color3.fromRGB(255, 0, 255),
-        text = Color3.fromRGB(255, 255, 255),
-        textSecondary = Color3.fromRGB(200, 200, 255),
-        border = Color3.fromRGB(100, 100, 255),
-        success = Color3.fromRGB(0, 255, 100),
-        warning = Color3.fromRGB(255, 255, 0),
-        error = Color3.fromRGB(255, 100, 100),
-        gradientStart = Color3.fromRGB(30, 30, 60),
-        gradientEnd = Color3.fromRGB(10, 10, 20),
-        shadow = Color3.fromRGB(0, 100, 255)
-    }
-}
-
--- Enhanced UI creation functions
-local function createFrame(parent, name, properties)
-    local frame = Instance.new("Frame")
-    frame.Name = AntiDetect.enabled and Security.generateRandomName(name) or name
-    frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    frame.BorderSizePixel = 0
-    frame.Parent = parent
-
-    if properties then
-        for prop, value in pairs(properties) do
-            frame[prop] = value
-        end
-    end
-
-    return MemoryManager.track(frame, "frame")
-end
-
-local function createTextLabel(parent, name, text, properties)
-    local label = Instance.new("TextLabel")
-    label.Name = AntiDetect.enabled and Security.generateRandomName(name) or name
-    label.Text = text or ""
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Config.DefaultFont
-    label.TextSize = Config.DefaultTextSize
-    label.Parent = parent
-
-    if properties then
-        for prop, value in pairs(properties) do
-            label[prop] = value
-        end
-    end
-
-    return MemoryManager.track(label, "textlabel")
-end
-
-local function createTextButton(parent, name, text, properties)
-    local button = Instance.new("TextButton")
-    button.Name = AntiDetect.enabled and Security.generateRandomName(name) or name
-    button.Text = text or ""
-    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Config.DefaultFont
-    button.TextSize = Config.DefaultTextSize
-    button.BorderSizePixel = 0
-    button.Parent = parent
-
-    if properties then
-        for prop, value in pairs(properties) do
-            button[prop] = value
-        end
-    end
-
-    return MemoryManager.track(button, "textbutton")
-end
-
-local function createImageLabel(parent, name, image, properties)
-    local imageLabel = Instance.new("ImageLabel")
-    imageLabel.Name = AntiDetect.enabled and Security.generateRandomName(name) or name
-    imageLabel.Image = image or ""
-    imageLabel.BackgroundTransparency = 1
-    imageLabel.Parent = parent
-
-    if properties then
-        for prop, value in pairs(properties) do
-            imageLabel[prop] = value
-        end
-    end
-
-    return MemoryManager.track(imageLabel, "imagelabel")
-end
-
-local function applyCornerRadius(obj, radius)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, radius)
-    corner.Parent = obj
-    return MemoryManager.track(corner, "uicorner")
-end
-
-local function applyPadding(obj, padding)
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, padding)
-    pad.PaddingBottom = UDim.new(0, padding)
-    pad.PaddingLeft = UDim.new(0, padding)
-    pad.PaddingRight = UDim.new(0, padding)
-    pad.Parent = obj
-    return MemoryManager.track(pad, "uipadding")
-end
-
-local function applyListLayout(obj, direction, padding)
-    local layout = Instance.new("UIListLayout")
-    layout.FillDirection = direction or Enum.FillDirection.Vertical
-    layout.Padding = UDim.new(0, padding or Config.Padding)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = obj
-    return MemoryManager.track(layout, "uilistlayout")
-end
-
-local function applyGradient(obj, colors, rotation)
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = colors
-    gradient.Rotation = rotation or 0
-    gradient.Parent = obj
-    return MemoryManager.track(gradient, "uigradient")
-end
-
-local function applyStroke(obj, color, thickness)
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = color
-    stroke.Thickness = thickness or 1
-    stroke.Parent = obj
-    return MemoryManager.track(stroke, "uistroke")
-end
-
-local function animate(obj, properties, duration, easingStyle)
-    duration = duration or Config.AnimationSpeed
-    easingStyle = easingStyle or Enum.EasingStyle.Quad
-
-    local tweenInfo = TweenInfo.new(duration, easingStyle, Enum.EasingDirection.InOut)
-
-    if TweenService then
-        local tween = TweenService:Create(obj, tweenInfo, properties)
-        tween:Play()
-        return tween
-    else
-        return AnimationSystem.create(obj, tweenInfo, properties)
-    end
-end
-
--- Advanced Window Class
-local Window = {}
-Window.__index = Window
-
-function Window.new(title, options)
-    options = options or {}
-    local self = setmetatable({}, Window)
-
-    self.Title = title or "Swift Window"
-    self.Theme = options.theme or Config.DefaultTheme
-    self.Colors = Themes[self.Theme] or Themes.dark
-    self.Draggable = options.draggable ~= false
-    self.Resizable = options.resizable or false
-    self.Minimizable = options.minimizable or true
-    self.Size = options.size or UDim2.new(0, 500, 0, 600)
-    self.Position = options.position or UDim2.new(0.5, -250, 0.5, -300)
-    self.MinSize = options.minSize or UDim2.new(0, 300, 0, 200)
-    self.MaxSize = options.maxSize or UDim2.new(1, 0, 1, 0)
-    self.Connections = {}
-    self.Minimized = false
-    self.Visible = true
-    self.OriginalSize = self.Size
-
-    self:CreateUI(options)
-    return self
-end
-
-function Window:CreateUI(options)
-    -- Main ScreenGui
-    self.ScreenGui = Instance.new("ScreenGui")
-    self.ScreenGui.Name = AntiDetect.enabled and Security.generateRandomName("SwiftScreenGui") or "SwiftScreenGui"
-    self.ScreenGui.ResetOnSpawn = false
-    self.ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Try CoreGui first, fallback to PlayerGui
-    local success = pcall(function()
-        self.ScreenGui.Parent = CoreGui
-    end)
-    
-    if not success then
-        self.ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-    end
-
-    -- Main Window Frame
-    self.Frame = createFrame(self.ScreenGui, "SwiftWindow", {
-        Size = self.Size,
-        Position = self.Position,
-        BackgroundColor3 = self.Colors.background,
-        BorderSizePixel = 0
-    })
-
-    -- Apply gradient background
-    applyGradient(self.Frame, ColorSequence.new{
-        ColorSequenceKeypoint.new(0, self.Colors.gradientStart),
-        ColorSequenceKeypoint.new(1, self.Colors.gradientEnd)
-    }, 45)
-
-    applyCornerRadius(self.Frame, Config.DefaultCornerRadius)
-    applyStroke(self.Frame, self.Colors.border, 1)
-
-    -- Title Bar
-    self.TitleBar = createFrame(self.Frame, "TitleBar", {
-        Size = UDim2.new(1, 0, 0, 40),
-        Position = UDim2.new(0, 0, 0, 0),
-        BackgroundColor3 = self.Colors.surface
-    })
-
-    applyGradient(self.TitleBar, ColorSequence.new{
-        ColorSequenceKeypoint.new(0, self.Colors.primary),
-        ColorSequenceKeypoint.new(1, self.Colors.accent)
-    }, 90)
-
-    applyCornerRadius(self.TitleBar, Config.DefaultCornerRadius)
-
-    -- Window Controls
-    self.ControlFrame = createFrame(self.TitleBar, "ControlFrame", {
-        Size = UDim2.new(0, 120, 1, 0),
-        Position = UDim2.new(1, -120, 0, 0),
-        BackgroundTransparency = 1
-    })
-
-    -- Minimize Button
-    if self.Minimizable then
-        self.MinimizeButton = createTextButton(self.ControlFrame, "Minimize", "−", {
-            Size = UDim2.new(0, 30, 0, 30),
-            Position = UDim2.new(0, 5, 0.5, -15),
-            BackgroundColor3 = Color3.fromRGB(255, 193, 7),
-            TextColor3 = Color3.fromRGB(255, 255, 255),
-            TextSize = 18,
-            Font = Enum.Font.GothamBold
-        })
-        applyCornerRadius(self.MinimizeButton, 4)
-        
-        self.MinimizeButton.MouseEnter:Connect(function()
-            animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 160, 0)}, 0.2)
-        end)
-        
-        self.MinimizeButton.MouseLeave:Connect(function()
-            animate(self.MinimizeButton, {BackgroundColor3 = Color3.fromRGB(255, 193, 7)}, 0.2)
-        end)
-        
-        self.MinimizeButton.MouseButton1Click:Connect(function()
-            self:ToggleMinimize()
-        end)
-    end
-
-    -- Close Button
-    self.CloseButton = createTextButton(self.ControlFrame, "Close", "×", {
-        Size = UDim2.new(0, 30, 0, 30),
-        Position = UDim2.new(1, -35, 0.5, -15),
-        BackgroundColor3 = Color3.fromRGB(244, 67, 54),
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        TextSize = 18,
-        Font = Enum.Font.GothamBold
-    })
-    applyCornerRadius(self.CloseButton, 4)
-
-    self.CloseButton.MouseEnter:Connect(function()
-        animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(229, 57, 53)}, 0.2)
-    end)
-
-    self.CloseButton.MouseLeave:Connect(function()
-        animate(self.CloseButton, {BackgroundColor3 = Color3.fromRGB(244, 67, 54)}, 0.2)
-    end)
-
-    self.CloseButton.MouseButton1Click:Connect(function()
-        self:Close()
-    end)
-
-    -- Title Text
-    self.TitleLabel = createTextLabel(self.TitleBar, "TitleLabel", self.Title, {
-        Size = UDim2.new(1, -140, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        Font = Enum.Font.GothamBold,
-        TextSize = 16
-    })
-    applyPadding(self.TitleLabel, 12)
-
-    -- Content Container
-    self.ContentFrame = createFrame(self.Frame, "ContentFrame", {
-        Size = UDim2.new(1, 0, 1, -40),
-        Position = UDim2.new(0, 0, 0, 40),
-        BackgroundTransparency = 1
-    })
-
-    applyListLayout(self.ContentFrame, Enum.FillDirection.Vertical, Config.Padding)
-    applyPadding(self.ContentFrame, Config.Padding)
-
-    -- Setup interactions
-    if self.Draggable then
-        self:SetupDragging()
-    end
-
-    if self.Resizable then
-        self:SetupResizing()
-    end
-
-    -- Show animation
-    self.Frame.Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)
-    animate(self.Frame, {Size = self.Size}, 0.4, Enum.EasingStyle.Back)
-
-    MemoryManager.track(self.ScreenGui, "screengui")
-end
-
-function Window:SetupDragging()
-    if not UserInputService then return end
-
-    local dragging = false
-    local dragStartPos = Vector2.new(0, 0)
-    local frameStartPos = Vector2.new(0, 0)
-
-    local dragStartConnection = self.TitleBar.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+-- Helper function for dragging
+local function MakeDraggable(topbar, object)
+    local dragging, dragInput, dragStart, startPos
+    topbar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            dragStartPos = Vector2.new(input.Position.X, input.Position.Y)
-            frameStartPos = Vector2.new(self.Frame.AbsolutePosition.X, self.Frame.AbsolutePosition.Y)
-            
-            -- Bring window to front
-            self.ScreenGui.DisplayOrder = 1000
+            dragStart = input.Position
+            startPos = object.Position
         end
     end)
-
-    local dragEndConnection = self.TitleBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    topbar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
         end
     end)
-
-    local dragMoveConnection = UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-            local delta = mousePos - dragStartPos
-            self.Frame.Position = UDim2.new(0, frameStartPos.X + delta.X, 0, frameStartPos.Y + delta.Y)
-        end
-    end)
-
-    table.insert(self.Connections, MemoryManager.trackConnection(dragStartConnection))
-    table.insert(self.Connections, MemoryManager.trackConnection(dragEndConnection))
-    table.insert(self.Connections, MemoryManager.trackConnection(dragMoveConnection))
-end
-
-function Window:SetupResizing()
-    if not UserInputService then return end
-
-    -- Resize handle
-    self.ResizeHandle = createFrame(self.Frame, "ResizeHandle", {
-        Size = UDim2.new(0, 20, 0, 20),
-        Position = UDim2.new(1, -20, 1, -20),
-        BackgroundColor3 = self.Colors.primary,
-        BorderSizePixel = 0
-    })
-    applyCornerRadius(self.ResizeHandle, Config.DefaultCornerRadius)
-
-    local resizing = false
-    local resizeStartPos = Vector2.new(0, 0)
-    local resizeStartSize = UDim2.new(0, 0, 0, 0)
-
-    local resizeStartConnection = self.ResizeHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            resizing = true
-            resizeStartPos = Vector2.new(input.Position.X, input.Position.Y)
-            resizeStartSize = self.Frame.Size
-        end
-    end)
-
-    local resizeEndConnection = UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            resizing = false
-        end
-    end)
-
-    local resizeMoveConnection = UserInputService.InputChanged:Connect(function(input)
-        if resizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local mousePos = Vector2.new(input.Position.X, input.Position.Y)
-            local delta = mousePos - resizeStartPos
-            
-            local newWidth = math.max(self.MinSize.X.Offset, math.min(self.MaxSize.X.Offset or 2000, resizeStartSize.X.Offset + delta.X))
-            local newHeight = math.max(self.MinSize.Y.Offset, math.min(self.MaxSize.Y.Offset or 2000, resizeStartSize.Y.Offset + delta.Y))
-            
-            self.Frame.Size = UDim2.new(0, newWidth, 0, newHeight)
-            self.ContentFrame.Size = UDim2.new(1, 0, 1, -40)
-        end
-    end)
-
-    table.insert(self.Connections, MemoryManager.trackConnection(resizeStartConnection))
-    table.insert(self.Connections, MemoryManager.trackConnection(resizeEndConnection))
-    table.insert(self.Connections, MemoryManager.trackConnection(resizeMoveConnection))
-end
-
-function Window:ToggleMinimize()
-    self.Minimized = not self.Minimized
-
-    if self.Minimized then
-        self.OriginalSize = self.Frame.Size
-        animate(self.Frame, {Size = UDim2.new(self.OriginalSize.X.Scale, self.OriginalSize.X.Offset, 0, 40)}, 0.3)
-        self.ContentFrame.Visible = false
-    else
-        animate(self.Frame, {Size = self.OriginalSize}, 0.3)
-        self.ContentFrame.Visible = true
-    end
-end
-
-function Window:ToggleVisibility()
-    self.Visible = not self.Visible
-    self.ScreenGui.Enabled = self.Visible
-end
-
-function Window:Close()
-    -- Clean up connections
-    for _, connection in ipairs(self.Connections) do
-        if connection and connection.Disconnect then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-
-    -- Animate out and destroy
-    animate(self.Frame, {Size = UDim2.new(self.Size.X.Scale, self.Size.X.Offset, 0, 0)}, 0.3, Enum.EasingStyle.Back)
-
-    task.wait(0.4)
-    if self.ScreenGui then
-        pcall(function() self.ScreenGui:Destroy() end)
-    end
-end
-
-function Window:SetTheme(themeName)
-    if Themes[themeName] then
-        self.Theme = themeName
-        self.Colors = Themes[themeName]
-
-        -- Update all UI elements with new theme
-        self.Frame.BackgroundColor3 = self.Colors.background
-        self.TitleBar.BackgroundColor3 = self.Colors.surface
-        self.TitleLabel.TextColor3 = self.Colors.text
-        
-        -- Update gradients
-        local titleGradient = self.TitleBar:FindFirstChildWhichIsA("UIGradient")
-        if titleGradient then
-            titleGradient.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0, self.Colors.primary),
-                ColorSequenceKeypoint.new(1, self.Colors.accent)
-            }
-        end
-    end
-end
-
--- Enhanced Button Class
-local Button = {}
-Button.__index = Button
-
-function Button.new(parent, text, callback, options)
-    options = options or {}
-    local self = setmetatable({}, Button)
-
-    self.Text = text or "Button"
-    self.Callback = callback
-    self.Parent = parent
-    self.Colors = parent.Colors
-    self.Hovered = false
-    self.Style = options.style or "default"
-    self.Animated = options.animated ~= false
-
-    self:CreateUI(options)
-    return self
-end
-
-function Button:CreateUI(options)
-    self.Frame = createFrame(self.Parent.ContentFrame, "Button", {
-        Size = UDim2.new(1, -Config.Padding * 2, 0, 40),
-        BackgroundColor3 = self.Colors.primary,
-        BorderSizePixel = 0,
-        LayoutOrder = options.order or 0
-    })
-
-    -- Apply gradient
-    applyGradient(self.Frame, ColorSequence.new{
-        ColorSequenceKeypoint.new(0, self.Colors.primary),
-        ColorSequenceKeypoint.new(1, self.Colors.accent)
-    }, 45)
-
-    applyCornerRadius(self.Frame, 6)
-    applyStroke(self.Frame, self.Colors.border, 1)
-
-    self.Button = createTextButton(self.Frame, "TextButton", self.Text, {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        TextColor3 = Color3.fromRGB(255, 255, 255),
-        Font = options.font or Config.DefaultFont,
-        TextSize = options.textSize or Config.DefaultTextSize
-    })
-
-    -- Hover effects
-    if self.Animated then
-        self.Button.MouseEnter:Connect(function()
-            self.Hovered = true
-            animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 42)}, 0.2)
-        end)
-        
-        self.Button.MouseLeave:Connect(function()
-            self.Hovered = false
-            animate(self.Frame, {Size = UDim2.new(1, -Config.Padding * 2, 0, 40)}, 0.2)
-        end)
-    end
-
-    self.Button.MouseButton1Click:Connect(function()
-        -- Click animation
-        if self.Animated then
-            local originalSize = self.Frame.Size
-            animate(self.Frame, {Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.95, originalSize.Y.Scale, originalSize.Y.Offset)}, 0.1)
-            task.wait(0.1)
-            animate(self.Frame, {Size = originalSize}, 0.1)
-        end
-        
-        if self.Callback then
-            local success, errorMsg = pcall(self.Callback)
-            if not success then
-                warn("Swift: Button callback error: " .. tostring(errorMsg))
-            end
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            object.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
 end
 
-function Button:SetText(text)
-    self.Text = text or ""
-    self.Button.Text = self.Text
-end
-
--- Notification System
-local NotificationSystem = {}
-NotificationSystem.notifications = {}
-NotificationSystem.maxHeight = 200
-
-function NotificationSystem.show(title, message, notificationType, duration)
-    notificationType = notificationType or "info"
-    duration = duration or 4
-    
-    -- Remove old notifications if too many
-    while #NotificationSystem.notifications >= Config.MaxNotifications do
-        local oldNotification = table.remove(NotificationSystem.notifications, 1)
-        if oldNotification and oldNotification.close then
-            oldNotification.close()
-        end
-    end
-    
-    local notification = {
-        title = title,
-        message = message,
-        type = notificationType,
-        duration = duration,
-        close = function() end
-    }
-    
-    NotificationSystem.create(notification)
-    table.insert(NotificationSystem.notifications, notification)
-    
-    return notification
-end
-
-function NotificationSystem.create(notification)
+function Library:Init(hubName)
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = Security.generateRandomName("NotificationGui")
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    
-    -- Try CoreGui first, fallback to PlayerGui
-    local success = pcall(function()
-        ScreenGui.Parent = CoreGui
-    end)
-    
-    if not success then
-        ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-    end
-    
-    local colors = Themes.dark
-    local typeColor = colors.primary
-    
-    if notification.type == "success" then
-        typeColor = colors.success
-    elseif notification.type == "warning" then
-        typeColor = colors.warning
-    elseif notification.type == "error" then
-        typeColor = colors.error
-    end
-    
-    -- Notification frame
-    local frame = createFrame(ScreenGui, "Notification", {
-        Size = UDim2.new(0, 350, 0, 80),
-        Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90))),
-        BackgroundColor3 = colors.surface,
-        BorderSizePixel = 0
-    })
-    
-    applyGradient(frame, ColorSequence.new{
-        ColorSequenceKeypoint.new(0, colors.surface),
-        ColorSequenceKeypoint.new(1, colors.background)
-    }, 180)
-    
-    applyCornerRadius(frame, 8)
-    applyStroke(frame, typeColor, 2)
-    
-    -- Icon
-    local iconText = notification.type == "success" and "✓" or 
-                    notification.type == "warning" and "⚠" or 
-                    notification.type == "error" and "✕" or "ℹ"
-    
-    local icon = createTextLabel(frame, "Icon", iconText, {
-        Size = UDim2.new(0, 30, 1, 0),
-        Position = UDim2.new(0, 10, 0, 0),
-        TextColor3 = typeColor,
-        TextSize = 20,
-        Font = Enum.Font.GothamBold
-    })
-    
-    -- Title
-    local titleLabel = createTextLabel(frame, "Title", notification.title, {
-        Size = UDim2.new(1, -80, 0, 25),
-        Position = UDim2.new(0, 50, 0, 10),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextColor3 = colors.text,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14
-    })
-    
-    -- Message
-    local messageLabel = createTextLabel(frame, "Message", notification.message, {
-        Size = UDim2.new(1, -80, 0, 35),
-        Position = UDim2.new(0, 50, 0, 30),
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-        TextColor3 = colors.textSecondary,
-        TextWrapped = true,
-        TextSize = 12
-    })
-    
-    -- Close button
-    local closeBtn = createTextButton(frame, "Close", "×", {
-        Size = UDim2.new(0, 20, 0, 20),
-        Position = UDim2.new(1, -25, 0, 5),
-        BackgroundTransparency = 1,
-        TextColor3 = colors.textSecondary,
-        TextSize = 16
-    })
-    
-    -- Animation in
-    frame.Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))
-    animate(frame, {Position = UDim2.new(1, -370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-    
-    -- Close function
-    local function close()
-        animate(frame, {Position = UDim2.new(1, 370, 1, -(90 + (#NotificationSystem.notifications * 90)))}, 0.4)
-        task.wait(0.5)
-        if ScreenGui then
-            pcall(function() ScreenGui:Destroy() end)
-        end
-    end
-    
-    notification.close = close
-    notification.gui = ScreenGui
-    
-    -- Auto close
-    task.spawn(function()
-        task.wait(notification.duration)
-        close()
-    end)
-    
-    -- Manual close
-    closeBtn.MouseButton1Click:Connect(close)
-    
-    MemoryManager.track(ScreenGui, "notification")
-end
+    ScreenGui.Name = "CustomLib_" .. math.random(100, 999)
+    ScreenGui.Parent = CoreGui
 
--- Keybind System
-local KeybindSystem = {}
-KeybindSystem.keybinds = {}
-KeybindSystem.connections = {}
+    local Main = Instance.new("Frame")
+    Main.Name = "Main"
+    Main.Size = UDim2.new(0, 450, 0, 300)
+    Main.Position = UDim2.new(0.5, -225, 0.5, -150)
+    Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Main.BorderSizePixel = 0
+    Main.Parent = ScreenGui
 
-function KeybindSystem.register(key, callback, description)
-    local keybind = {
-        key = key,
-        callback = callback,
-        description = description or "",
-        enabled = true
-    }
-    
-    table.insert(KeybindSystem.keybinds, keybind)
-    
-    if #KeybindSystem.connections == 0 then
-        KeybindSystem.startListening()
-    end
-    
-    return keybind
-end
+    -- Add rounded corners
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius =集中 (UDim.new(0, 8))
+    UICorner.Parent = Main
 
-function KeybindSystem.startListening()
-    if not UserInputService then return end
+    local TopBar = Instance.new("Frame")
+    TopBar.Size = UDim2.new(1, 0, 0, 40)
+    TopBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    TopBar.BorderSizePixel = 0
+    TopBar.Parent = Main
     
-    local connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        for _, keybind in ipairs(KeybindSystem.keybinds) do
-            if keybind.enabled and input.KeyCode == keybind.key then
-                local success, errorMsg = pcall(keybind.callback)
-                if not success then
-                    warn("Swift: Keybind callback error: " .. tostring(errorMsg))
-                end
+    local TopCorner = Instance.new("UICorner")
+    TopCorner.Parent = TopBar
+
+    local Title = Instance.new("TextLabel")
+    Title.Text = hubName
+    Title.Size = UDim2.new(1, -20, 1, 0)
+    Title.Position = UDim2.new(0, 10, 0, 0)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.BackgroundTransparency = 1
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 16
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = TopBar
+
+    -- Container for Tabs (Sidebar)
+    local Sidebar = Instance.new("ScrollingFrame")
+    Sidebar.Size = UDim2.new(0, 120, 1, -40)
+    Sidebar.Position = UDim2.new(0, 0, 0, 40)
+    Sidebar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Sidebar.BorderSizePixel = 0
+    Sidebar.ScrollBarThickness = 2
+    Sidebar.Parent = Main
+
+    local SidebarList = Instance.new("UIListLayout")
+    SidebarList.Parent = Sidebar
+    SidebarList.Padding = UDim.new(0, 5)
+
+    -- Container for Content
+    local Pages = Instance.new("Frame")
+    Pages.Size = UDim2.new(1, -130, 1, -50)
+    Pages.Position = UDim2.new(0, 125, 0, 45)
+    Pages.BackgroundTransparency = 1
+    Pages.Parent = Main
+
+    MakeDraggable(TopBar, Main)
+
+    local Tabs = {}
+
+    function Tabs:CreateTab(tabName)
+        local Page = Instance.new("ScrollingFrame")
+        Page.Size = UDim2.new(1, 0, 1, 0)
+        Page.BackgroundTransparency = 1
+        Page.Visible = false
+        Page.ScrollBarThickness = 2
+        Page.Parent = Pages
+
+        local PageList = Instance.new("UIListLayout")
+        PageList.Parent = Page
+        PageList.Padding = UDim.new(0, 8)
+
+        local TabBtn = Instance.new("TextButton")
+        TabBtn.Size = UDim2.new(1, -10, 0, 30)
+        TabBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        TabBtn.Text = tabName
+        TabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        TabBtn.Font = Enum.Font.Gotham
+        TabBtn.Parent = Sidebar
+
+        local TabCorner = Instance.new("UICorner")
+        TabCorner.Parent = TabBtn
+
+        TabBtn.MouseButton1Click:Connect(function()
+            for _, v in pairs(Pages:GetChildren()) do
+                if v:IsA("ScrollingFrame") then v.Visible = false end
             end
-        end
-    end)
-    
-    table.insert(KeybindSystem.connections, MemoryManager.trackConnection(connection))
-end
-
-function KeybindSystem.unregister(keybind)
-    for i, kb in ipairs(KeybindSystem.keybinds) do
-        if kb == keybind then
-            table.remove(KeybindSystem.keybinds, i)
-            break
-        end
-    end
-end
-
-function KeybindSystem.cleanup()
-    for _, connection in ipairs(KeybindSystem.connections) do
-        if connection then
-            pcall(function() connection:Disconnect() end)
-        end
-    end
-    KeybindSystem.connections = {}
-    KeybindSystem.keybinds = {}
-end
-
--- Swift API
-function Swift.CreateWindow(title, options)
-    return Window.new(title, options)
-end
-
-function Swift.CreateButton(parent, text, callback, options)
-    return Button.new(parent, text, callback, options)
-end
-
-function Swift.CreateLabel(parent, text, options)
-    options = options or {}
-    local label = createTextLabel(parent.ContentFrame, "Label", text, {
-        Size = UDim2.new(1, -Config.Padding * 2, 0, 20),
-        TextXAlignment = options.alignment or Enum.TextXAlignment.Left,
-        TextColor3 = options.color or parent.Colors.text,
-        Font = options.font or Config.DefaultFont,
-        TextSize = options.textSize or Config.DefaultTextSize,
-        LayoutOrder = options.order or 0
-    })
-    return label
-end
-
-function Swift.ShowNotification(title, message, notificationType, duration)
-    return NotificationSystem.show(title, message, notificationType, duration)
-end
-
-function Swift.RegisterKeybind(key, callback, description)
-    return KeybindSystem.register(key, callback, description)
-end
-
-function Swift.SetTheme(themeName)
-    if Themes[themeName] then
-        Config.DefaultTheme = themeName
-    else
-        warn("Swift: Theme '" .. themeName .. "' not found.")
-    end
-end
-
-function Swift.GetThemes()
-    local themeNames = {}
-    for name, _ in pairs(Themes) do
-        table.insert(themeNames, name)
-    end
-    return themeNames
-end
-
-function Swift.SetConfig(newConfig)
-    if type(newConfig) ~= "table" then
-        warn("Swift: Config must be a table")
-        return
-    end
-
-    for key, value in pairs(newConfig) do
-        if Config[key] ~= nil then
-            Config[key] = value
-        else
-            warn("Swift: Unknown config key: " .. tostring(key))
-        end
-    end
-end
-
-function Swift.GetConfig()
-    return {
-        DefaultFont = Config.DefaultFont,
-        DefaultTextSize = Config.DefaultTextSize,
-        DefaultCornerRadius = Config.DefaultCornerRadius,
-        AnimationSpeed = Config.AnimationSpeed,
-        DefaultTheme = Config.DefaultTheme,
-        Padding = Config.Padding,
-        BlurSize = Config.BlurSize,
-        MaxNotifications = Config.MaxNotifications,
-        AutoCleanup = Config.AutoCleanup,
-        AntiDetect = AntiDetect.enabled
-    }
-end
-
-function Swift.Cleanup()
-    MemoryManager.cleanupAll()
-    KeybindSystem.cleanup()
-    NotificationSystem.notifications = {}
-    AnimationSystem.animations = {}
-end
-
-function Swift.GetInfo()
-    return {
-        Version = Swift.Version,
-        isExploit = Swift.isExploit,
-        executorName = Swift.executorName,
-        memoryUsage = #MemoryManager.objects,
-        activeAnimations = #AnimationSystem.animations,
-        activeKeybinds = #KeybindSystem.keybinds
-    }
-end
-
--- Auto-cleanup on game end
-if Players and Players.LocalPlayer then
-    pcall(function()
-        Players.LocalPlayer.CharacterRemoving:Connect(function()
-            Swift.Cleanup()
+            Page.Visible = true
         end)
-    end)
+
+        local Elements = {}
+
+        function Elements:CreateButton(text, callback)
+            local Button = Instance.new("TextButton")
+            Button.Size = UDim2.new(1, -10, 0, 35)
+            Button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+            Button.Text = text
+            Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            Button.Font = Enum.Font.Gotham
+            Button.AutoButtonColor = false
+            Button.Parent = Page
+
+            local BtnCorner = Instance.new("UICorner")
+            BtnCorner.Parent = Button
+
+            Button.MouseEnter:Connect(function()
+                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(60, 60, 60)})
+            end)
+            Button.MouseLeave:Connect(function()
+                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(45, 45, 45)})
+            end)
+
+            Button.MouseButton1Click:Connect(function()
+                -- Button feedback effect
+                Button.TextSize = 12
+                Tween(Button, 0.1, {TextSize = 14})
+                callback()
+            end)
+        end
+
+        return Elements
+    end
+
+    return Tabs
 end
 
--- Global export
-_G.Swift = Swift
-
-return Swift
+return Library
