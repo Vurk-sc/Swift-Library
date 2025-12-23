@@ -1,15 +1,15 @@
--- SERVICES
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
-local Library = {}
+local Library = {
+    AccentColor = Color3.fromRGB(0, 170, 255), -- The "brand" color
+    Font = Enum.Font.GothamSemibold
+}
 
 -- UTILITIES
-local function Tween(obj, info, goal)
-    local tween = TweenService:Create(obj, TweenInfo.new(info, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
-    tween:Play()
-    return tween
+local function Tween(obj, time, goal)
+    TweenService:Create(obj, TweenInfo.new(time, Enum.EasingStyle.Sine), goal):Play()
 end
 
 local function MakeDraggable(topbar, object)
@@ -22,9 +22,7 @@ local function MakeDraggable(topbar, object)
         end
     end)
     topbar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -34,81 +32,89 @@ local function MakeDraggable(topbar, object)
     end)
 end
 
--- CORE FUNCTIONS
 function Library:Init(hubName)
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "CustomLib_" .. math.random(100, 999)
-    -- Change to CoreGui if using an executor
+    ScreenGui.Name = "ImprovedLib"
     ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
     ScreenGui.ResetOnSpawn = false
 
     local Main = Instance.new("Frame")
     Main.Name = "Main"
-    Main.Size = UDim2.new(0, 500, 0, 350)
-    Main.Position = UDim2.new(0.5, -250, 0.5, -175)
-    Main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Main.Size = UDim2.new(0, 550, 0, 380)
+    Main.Position = UDim2.new(0.5, -275, 0.5, -190)
+    Main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     Main.BorderSizePixel = 0
     Main.Parent = ScreenGui
 
+    -- Add a subtle border to the whole menu
+    local MainStroke = Instance.new("UIStroke")
+    MainStroke.Thickness = 2
+    MainStroke.Color = Color3.fromRGB(40, 40, 40)
+    MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    MainStroke.Parent = Main
+
     local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 10)
+    MainCorner.CornerRadius = UDim.new(0, 12)
     MainCorner.Parent = Main
 
     -- TopBar
     local TopBar = Instance.new("Frame")
-    TopBar.Name = "TopBar"
-    TopBar.Size = UDim2.new(1, 0, 0, 45)
-    TopBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    TopBar.Size = UDim2.new(1, 0, 0, 50)
+    TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     TopBar.BorderSizePixel = 0
     TopBar.Parent = Main
     
     local TopCorner = Instance.new("UICorner")
+    TopCorner.CornerRadius = UDim.new(0, 12)
     TopCorner.Parent = TopBar
 
     local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Text = hubName
+    Title.Text = hubName:upper()
     Title.Size = UDim2.new(1, -20, 1, 0)
-    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Position = UDim2.new(0, 20, 0, 0)
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.BackgroundTransparency = 1
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 18
+    Title.Font = Library.Font
+    Title.TextSize = 20
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Parent = TopBar
 
-    -- Content Areas
+    -- Accent Line under TopBar
+    local AccentLine = Instance.new("Frame")
+    AccentLine.Size = UDim2.new(1, 0, 0, 2)
+    AccentLine.Position = UDim2.new(0, 0, 1, -2)
+    AccentLine.BackgroundColor3 = Library.AccentColor
+    AccentLine.BorderSizePixel = 0
+    AccentLine.Parent = TopBar
+
+    -- Content
     local Sidebar = Instance.new("ScrollingFrame")
-    Sidebar.Name = "Sidebar"
-    Sidebar.Size = UDim2.new(0, 130, 1, -55)
-    Sidebar.Position = UDim2.new(0, 5, 0, 50)
+    Sidebar.Size = UDim2.new(0, 150, 1, -60)
+    Sidebar.Position = UDim2.new(0, 10, 0, 60)
     Sidebar.BackgroundTransparency = 1
-    Sidebar.BorderSizePixel = 0
     Sidebar.ScrollBarThickness = 0
     Sidebar.Parent = Main
 
-    local SidebarLayout = Instance.new("UIListLayout")
-    SidebarLayout.Parent = Sidebar
-    SidebarLayout.Padding = UDim.new(0, 5)
+    local SidebarList = Instance.new("UIListLayout")
+    SidebarList.Parent = Sidebar
+    SidebarList.Padding = UDim.new(0, 8)
 
     local PageContainer = Instance.new("Frame")
-    PageContainer.Name = "PageContainer"
-    PageContainer.Size = UDim2.new(1, -150, 1, -60)
-    PageContainer.Position = UDim2.new(0, 140, 0, 50)
+    PageContainer.Size = UDim2.new(1, -180, 1, -70)
+    PageContainer.Position = UDim2.new(0, 170, 0, 60)
     PageContainer.BackgroundTransparency = 1
     PageContainer.Parent = Main
 
     MakeDraggable(TopBar, Main)
 
     local Tabs = {}
-    local firstTab = true
+    local first = true
 
     function Tabs:CreateTab(tabName)
         local Page = Instance.new("ScrollingFrame")
-        Page.Name = tabName .. "Page"
         Page.Size = UDim2.new(1, 0, 1, 0)
         Page.BackgroundTransparency = 1
-        Page.Visible = firstTab
+        Page.Visible = first
         Page.ScrollBarThickness = 2
         Page.Parent = PageContainer
 
@@ -117,65 +123,54 @@ function Library:Init(hubName)
         PageList.Padding = UDim.new(0, 10)
 
         local TabBtn = Instance.new("TextButton")
-        TabBtn.Name = tabName .. "Btn"
-        TabBtn.Size = UDim2.new(1, 0, 0, 35)
-        TabBtn.BackgroundColor3 = firstTab and Color3.fromRGB(45, 45, 45) or Color3.fromRGB(30, 30, 30)
+        TabBtn.Size = UDim2.new(1, -5, 0, 35)
+        TabBtn.BackgroundColor3 = first and Library.AccentColor or Color3.fromRGB(25, 25, 25)
         TabBtn.Text = tabName
         TabBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        TabBtn.Font = Enum.Font.GothamMedium
-        TabBtn.TextSize = 14
+        TabBtn.Font = Library.Font
         TabBtn.Parent = Sidebar
 
-        local TabCorner = Instance.new("UICorner")
-        TabCorner.CornerRadius = UDim.new(0, 6)
-        TabCorner.Parent = TabBtn
+        Instance.new("UICorner", TabBtn).CornerRadius = UDim.new(0, 6)
 
         TabBtn.MouseButton1Click:Connect(function()
-            for _, p in pairs(PageContainer:GetChildren()) do
-                if p:IsA("ScrollingFrame") then p.Visible = false end
-            end
-            for _, b in pairs(Sidebar:GetChildren()) do
-                if b:IsA("TextButton") then 
-                    Tween(b, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}) 
-                end
+            for _, p in pairs(PageContainer:GetChildren()) do if p:IsA("ScrollingFrame") then p.Visible = false end end
+            for _, b in pairs(Sidebar:GetChildren()) do 
+                if b:IsA("TextButton") then Tween(b, 0.3, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}) end 
             end
             Page.Visible = true
-            Tween(TabBtn, 0.2, {BackgroundColor3 = Color3.fromRGB(45, 45, 45)})
+            Tween(TabBtn, 0.3, {BackgroundColor3 = Library.AccentColor})
         end)
 
-        firstTab = false
-
+        first = false
         local Elements = {}
 
-        -- BUTTON ELEMENT
         function Elements:CreateButton(text, callback)
             local Button = Instance.new("TextButton")
-            Button.Size = UDim2.new(1, -10, 0, 40)
-            Button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-            Button.Text = text
-            Button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            Button.Font = Enum.Font.Gotham
-            Button.TextSize = 14
-            Button.AutoButtonColor = false
+            Button.Size = UDim2.new(1, -15, 0, 40)
+            Button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            Button.Text = "  " .. text -- Simple padding
+            Button.TextColor3 = Color3.fromRGB(200, 200, 200)
+            Button.Font = Library.Font
+            Button.TextXAlignment = Enum.TextXAlignment.Left
             Button.Parent = Page
 
-            local BtnCorner = Instance.new("UICorner")
-            BtnCorner.Parent = Button
+            local BtnStroke = Instance.new("UIStroke")
+            BtnStroke.Color = Color3.fromRGB(50, 50, 50)
+            BtnStroke.Thickness = 1
+            BtnStroke.Parent = Button
+
+            Instance.new("UICorner", Button).CornerRadius = UDim.new(0, 6)
 
             Button.MouseEnter:Connect(function()
-                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(55, 55, 55)})
+                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 40), TextColor3 = Color3.fromRGB(255, 255, 255)})
+                Tween(BtnStroke, 0.2, {Color = Library.AccentColor})
             end)
             Button.MouseLeave:Connect(function()
-                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(40, 40, 40)})
+                Tween(Button, 0.2, {BackgroundColor3 = Color3.fromRGB(30, 30, 30), TextColor3 = Color3.fromRGB(200, 200, 200)})
+                Tween(BtnStroke, 0.2, {Color = Color3.fromRGB(50, 50, 50)})
             end)
 
-            Button.MouseButton1Click:Connect(function()
-                local originalSize = Button.TextSize
-                Button.TextSize = originalSize - 2
-                task.wait(0.1)
-                Button.TextSize = originalSize
-                callback()
-            end)
+            Button.MouseButton1Click:Connect(callback)
         end
 
         return Elements
