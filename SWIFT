@@ -1,18 +1,7 @@
 --[[
-    SWIFT UI LIBRARY - EXPLOIT OPTIMIZED VERSION
-    Designed for Roblox exploit environments with loadstring
-
-    Features:
-    • Anti-detection mechanisms
-    • Memory efficient design
-    • Advanced animations and effects
-    • Exploit-specific utilities
-    • Cross-platform compatibility
-
+    SWIFT UI LIBRARY
     Version: 2.0.1
     Author: Ist5208
-
-    Usage: loadstring(game:HttpGet("URL"))()
 ]]
 
 -- Environment detection and compatibility
